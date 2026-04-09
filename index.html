@@ -1,0 +1,2799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copilot Studio Conversation Trace Viewer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+  }
+  header .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .container {
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  /* App layout: trace + chat side by side */
+  .app-layout {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    min-height: calc(100vh - 120px);
+  }
+  .app-layout .trace-pane {
+    flex: 1 1 0;
+    min-width: 300px;
+    overflow-y: auto;
+  }
+  .app-layout .resize-handle {
+    width: 6px;
+    cursor: col-resize;
+    background: var(--border);
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  .app-layout .resize-handle:hover,
+  .app-layout .resize-handle.dragging {
+    background: var(--accent);
+  }
+  .app-layout .resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    border-radius: 2px;
+    background: var(--text-muted);
+    opacity: 0.5;
+  }
+  .app-layout .chat-pane {
+    width: 380px;
+    min-width: 250px;
+    max-width: 70%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .chat-pane.hidden { display: none; }
+  .chat-pane-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+  .chat-pane-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chat-pane-header h3::before { content: '\1F4AC'; font-size: 16px; }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+    position: relative;
+  }
+  .chat-bubble:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .chat-bubble.highlight-pulse {
+    animation: chatPulse 1s ease-out;
+  }
+  @keyframes chatPulse {
+    0% { box-shadow: 0 0 0 3px var(--accent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  .chat-bubble-bot {
+    align-self: flex-start;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-bubble-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble-name {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent);
+  }
+  .chat-bubble-user .chat-bubble-name { color: rgba(255,255,255,0.8); }
+  .chat-bubble-text { overflow-wrap: break-word; }
+  .chat-bubble-text p { margin-bottom: 6px; }
+  .chat-bubble-text p:last-child { margin-bottom: 0; }
+  .chat-bubble-text h3 { font-size: 13px; margin: 6px 0 4px; }
+  .chat-bubble-text ol, .chat-bubble-text ul { padding-left: 18px; margin: 4px 0; }
+  .chat-bubble-text li { margin-bottom: 2px; }
+  .chat-bubble-text strong { font-weight: 600; }
+  .chat-bubble-ts {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-align: right;
+  }
+  .chat-bubble-user .chat-bubble-ts { color: rgba(255,255,255,0.6); }
+  .chat-bubble-citations {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 11px;
+  }
+  .chat-bubble-citations a {
+    color: var(--accent);
+    text-decoration: none;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .chat-bubble-user .chat-bubble-citations a { color: rgba(255,255,255,0.85); }
+  .chat-bubble-citations a:hover { text-decoration: underline; }
+
+  /* Upload Zone */
+  #upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 60px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 24px;
+  }
+  #upload-zone:hover, #upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.05);
+  }
+  #upload-zone .icon { font-size: 48px; margin-bottom: 12px; }
+  #upload-zone p { color: var(--text-muted); font-size: 14px; }
+  #upload-zone .big { font-size: 16px; color: var(--text); font-weight: 500; margin-bottom: 8px; }
+  #file-input { display: none; }
+
+  /* Conversation Info Bar */
+  .conv-info {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .conv-info .info-item label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .conv-info .info-item span {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* Filter Tabs */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .filter-btn .count {
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    font-size: 11px;
+  }
+  .filter-btn.active .count { background: rgba(255,255,255,0.2); }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  /* Nested timelines inside plan groups don't get the root line */
+  .plan-group-children {
+    position: relative;
+  }
+  .plan-group-children .step {
+    padding-left: 0;
+  }
+  .step {
+    position: relative;
+    margin-bottom: 4px;
+    transition: all 0.15s;
+  }
+  .step .dot {
+    position: absolute;
+    left: -32px;
+    top: 14px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    z-index: 1;
+  }
+  /* Inside plan groups, hide dots to avoid overlap with the plan border */
+  .plan-group-children .step .dot { display: none; }
+  .step.type-user-message .dot { background: var(--accent); border-color: var(--accent); }
+  .step.type-bot-message .dot { background: var(--green); border-color: var(--green); }
+  .step.type-plan .dot { background: var(--purple); border-color: var(--purple); }
+  .step.type-thought .dot { background: var(--orange); border-color: var(--orange); }
+  .step.type-tool .dot { background: var(--cyan); border-color: var(--cyan); }
+  .step.type-search .dot { background: var(--pink); border-color: var(--pink); }
+  .step.type-error .dot { background: var(--red); border-color: var(--red); }
+  .step.type-info .dot { background: var(--text-muted); border-color: var(--text-muted); }
+  .step.type-typing .dot { background: var(--surface2); border-color: var(--text-muted); width:8px; height:8px; top:16px; left:-30px; }
+
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.15s;
+  }
+  .step-card:hover { border-color: #484f58; }
+  .step-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: var(--surface2); }
+  .step-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .badge-user { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-bot { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-plan { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .badge-thought { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .badge-tool { background: rgba(57,210,192,0.15); color: var(--cyan); }
+  .badge-search { background: rgba(247,120,186,0.15); color: var(--pink); }
+  .badge-error { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge-info { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+  .badge-typing { background: rgba(139,148,158,0.1); color: var(--text-muted); }
+
+  .step-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .step-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .step-chevron {
+    color: var(--text-muted);
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+  .step.expanded .step-chevron { transform: rotate(90deg); }
+
+  .step-detail {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--border);
+  }
+  .step.expanded .step-detail { display: block; }
+
+  .detail-section {
+    margin-top: 12px;
+  }
+  .detail-section h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .detail-content {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .detail-content.message-text {
+    background: transparent;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .detail-content code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  .detail-content .kv-row {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+  }
+  .detail-content .kv-row:last-child { border-bottom: none; }
+  .detail-content .kv-key {
+    color: var(--accent);
+    font-weight: 500;
+    min-width: 140px;
+    font-size: 12px;
+  }
+  .detail-content .kv-val {
+    flex: 1;
+    font-size: 12px;
+  }
+
+  .search-result-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .search-result-item .sr-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .search-result-item .sr-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .search-result-item .sr-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-height: 100px;
+    overflow: hidden;
+  }
+
+  .hidden { display: none !important; }
+
+  /* Markdown-ish rendering */
+  .rendered-md h3 { font-size: 15px; margin: 12px 0 6px; color: #fff; }
+  .rendered-md strong { color: #fff; }
+  .rendered-md ul, .rendered-md ol { padding-left: 20px; margin: 6px 0; }
+  .rendered-md li { margin: 3px 0; }
+  .rendered-md p { margin: 6px 0; }
+
+  /* Plan group containers */
+  .plan-group {
+    position: relative;
+    margin-bottom: 4px;
+  }
+  .plan-group-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .plan-group-header:hover { background: var(--surface2); border-color: #484f58; }
+  .plan-group-header .plan-icon {
+    font-size: 14px;
+    transition: transform 0.2s;
+  }
+  .plan-group.collapsed .plan-icon { transform: rotate(0deg); }
+  .plan-group:not(.collapsed) .plan-icon { transform: rotate(90deg); }
+  .plan-group-header .plan-id {
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--text-muted);
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .plan-group-header .plan-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .plan-status.completed { background: rgba(63,185,80,0.15); color: var(--green); }
+  .plan-status.cancelled { background: rgba(248,81,73,0.15); color: var(--red); }
+  .plan-status.running { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .plan-group-children {
+    margin-left: 18px;
+    padding-left: 14px;
+    border-left: 2px solid rgba(188,140,255,0.3);
+    padding-top: 4px;
+    padding-bottom: 2px;
+  }
+  .plan-group.collapsed .plan-group-children { display: none; }
+  /* Depth coloring for nested plans */
+  .plan-group .plan-group .plan-group-children {
+    border-left-color: rgba(57,210,192,0.3);
+  }
+  .plan-group .plan-group .plan-group .plan-group-children {
+    border-left-color: rgba(247,120,186,0.3);
+  }
+  .plan-group .plan-group-header .plan-step-count {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .plan-group-header .plan-ancestry {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* Plan affiliation pill on step cards */
+  .plan-pill {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    font-family: monospace;
+    letter-spacing: 0.3px;
+  }
+  .plan-pill-0 { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .plan-pill-1 { background: rgba(57,210,192,0.15); color: var(--cyan); }
+  .plan-pill-2 { background: rgba(247,120,186,0.15); color: var(--pink); }
+  .plan-pill-3 { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .plan-pill-4 { background: rgba(88,166,255,0.15); color: var(--accent); }
+
+  /* Toolbar: Expand/Collapse All + Re-upload */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .toolbar-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .toolbar-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toolbar-btn.primary:hover { background: #79b8ff; }
+  .toolbar-spacer { flex: 1; }
+  .toolbar .file-name {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: monospace;
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  /* Unknown event auto-rendered KV */
+  .auto-kv-section { margin-top: 8px; }
+  .auto-kv-section .auto-kv-key {
+    color: var(--cyan);
+    font-weight: 600;
+    font-size: 12px;
+    margin-top: 6px;
+    display: block;
+  }
+  .auto-kv-section .auto-kv-val {
+    font-size: 12px;
+    color: var(--text);
+    margin-left: 8px;
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Search box */
+  .search-box {
+    position: relative;
+    flex: 0 1 280px;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 6px 12px 6px 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box input::placeholder { color: var(--text-muted); }
+  .search-box .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .search-box .search-count {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .step.search-hidden { display: none !important; }
+  .plan-group.search-hidden { display: none !important; }
+  .step .search-highlight {
+    background: rgba(210,153,34,0.35);
+    color: #fff;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  /* Error/Warning banner */
+  .error-banner {
+    background: rgba(248,81,73,0.08);
+    border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+  .error-banner h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--red);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .error-banner .error-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 0 -8px;
+  }
+  .error-banner .error-item:hover { background: rgba(248,81,73,0.1); }
+  .error-banner .error-item .error-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .error-badge-error { background: rgba(248,81,73,0.2); color: var(--red); }
+  .error-badge-warning { background: rgba(210,153,34,0.2); color: var(--orange); }
+  .error-badge-cancelled { background: rgba(188,140,255,0.2); color: var(--purple); }
+
+  /* Duration bar on step cards */
+  .step-duration {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .duration-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+    min-width: 2px;
+    max-width: 60px;
+    display: inline-block;
+    vertical-align: middle;
+    opacity: 0.7;
+  }
+  .duration-bar.slow { background: var(--orange); opacity: 1; }
+  .duration-bar.very-slow { background: var(--red); opacity: 1; }
+
+  /* Stats panel */
+  .stats-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px 20px;
+  }
+  .stat-card {
+    text-align: center;
+    padding: 8px 4px;
+  }
+  .stat-card .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+  }
+  .stat-card .stat-value.stat-green { color: var(--green); }
+  .stat-card .stat-value.stat-red { color: var(--red); }
+  .stat-card .stat-value.stat-orange { color: var(--orange); }
+  .stat-card .stat-value.stat-accent { color: var(--accent); }
+  .stat-card .stat-value.stat-purple { color: var(--purple); }
+  .stat-card .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Copy button on step cards */
+  .step-copy {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .step-copy:hover { color: var(--accent); background: var(--surface2); }
+  .step-copy.copied { color: var(--green); }
+
+  /* Breadcrumb trail */
+  .breadcrumb-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-height: 30px;
+    margin-bottom: 8px;
+  }
+  .breadcrumb-bar.empty { display: none; }
+  .breadcrumb-bar .bc-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+  }
+  .breadcrumb-bar .bc-item {
+    color: var(--text);
+    cursor: pointer;
+    padding: 1px 6px;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .breadcrumb-bar .bc-item:hover { background: var(--surface2); color: var(--accent); }
+  .breadcrumb-bar .bc-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  /* Compare mode */
+  .compare-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .compare-pane {
+    min-width: 0;
+  }
+  .compare-pane .pane-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .compare-pane .pane-header .pane-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .pane-label-a { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .pane-label-b { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .compare-pane .pane-header .pane-filename {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compare-pane .pane-body {
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--bg);
+  }
+  .compare-pane .pane-body .timeline {
+    padding-left: 16px;
+  }
+  .compare-pane .pane-body .timeline::before { left: 5px; }
+  .compare-pane .pane-body .step { font-size: 12px; }
+  .compare-pane .pane-body .step-header { padding: 6px 10px; gap: 6px; }
+  .compare-pane .pane-body .step-badge { font-size: 8px; padding: 1px 5px; }
+  .compare-pane .pane-body .step-title { font-size: 11px; }
+  .compare-pane .pane-body .step-time { font-size: 9px; }
+  .compare-pane .pane-body .step-chevron { font-size: 10px; }
+  .compare-pane .pane-body .plan-group-header { padding: 6px 10px; font-size: 11px; }
+
+  /* Compare diff summary */
+  .compare-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .compare-summary h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+  .compare-summary .diff-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr 1fr;
+    gap: 4px 12px;
+    font-size: 12px;
+  }
+  .compare-summary .diff-grid .diff-label {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .compare-summary .diff-grid .diff-val {
+    color: var(--text);
+  }
+  .compare-summary .diff-grid .diff-val.diff-changed {
+    color: var(--orange);
+    font-weight: 600;
+  }
+  .compare-upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .compare-upload-zone:hover, .compare-upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.05);
+  }
+  .compare-upload-zone p { color: var(--text-muted); font-size: 13px; }
+  .compare-upload-zone .compare-icon { font-size: 28px; margin-bottom: 6px; }
+
+  @media (max-width: 768px) {
+    .container { padding: 12px; }
+    header { padding: 12px 16px; }
+    #upload-zone { padding: 30px; }
+    .conv-info { gap: 12px; }
+    .app-layout { flex-direction: column; }
+    .app-layout .chat-pane { width: 100% !important; max-width: 100%; border-left: none; border-top: 1px solid var(--border); min-height: 300px; }
+    .app-layout .resize-handle { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Copilot Studio Trace Viewer</h1>
+    <div class="subtitle">Upload a dialog.json to explore conversation steps</div>
+  </div>
+</header>
+
+<div class="container">
+  <div id="upload-zone">
+    <div class="icon">&#128270;</div>
+    <div class="big">Drop a dialog.json or .zip file here, or click to upload</div>
+    <p>Exported conversation trace from Copilot Studio</p>
+    <input type="file" id="file-input" accept=".json,.zip">
+  </div>
+
+  <div class="app-layout" id="app-layout">
+    <div class="trace-pane" id="trace-pane">
+      <div id="viewer" class="hidden">
+        <div class="toolbar" id="toolbar"></div>
+        <div class="conv-info" id="conv-info"></div>
+        <div id="stats-panel" class="stats-panel hidden"></div>
+        <div id="error-banner" class="error-banner hidden"></div>
+        <div class="filter-bar" id="filter-bar"></div>
+        <div id="breadcrumb-bar" class="breadcrumb-bar empty"></div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+      <div id="compare-view" class="hidden"></div>
+    </div>
+
+    <div class="resize-handle hidden" id="resize-handle"></div>
+
+    <div class="chat-pane hidden" id="chat-pane">
+      <div class="chat-pane-header">
+        <h3>Chat</h3>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const uploadZone = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('file-input');
+  const viewer = document.getElementById('viewer');
+  const toolbar = document.getElementById('toolbar');
+  const convInfo = document.getElementById('conv-info');
+  const statsPanel = document.getElementById('stats-panel');
+  const errorBanner = document.getElementById('error-banner');
+  const filterBar = document.getElementById('filter-bar');
+  const breadcrumbBar = document.getElementById('breadcrumb-bar');
+  const timeline = document.getElementById('timeline');
+  const compareView = document.getElementById('compare-view');
+  const chatPane = document.getElementById('chat-pane');
+  const chatMessages = document.getElementById('chat-messages');
+  const resizeHandle = document.getElementById('resize-handle');
+  let currentFileName = '';
+  let lastLoadedData = null; // keep reference for export
+  let scrollCleanup = null; // to remove scroll listener on reset
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+  async function handleFile(file) {
+    currentFileName = file.name;
+    const ext = file.name.toLowerCase().split('.').pop();
+
+    if (ext === 'zip') {
+      try {
+        const arrayBuf = await file.arrayBuffer();
+        const jsonText = await extractJsonFromZip(arrayBuf);
+        const data = JSON.parse(jsonText);
+        processDialog(data);
+      } catch(err) {
+        alert('Error processing ZIP: ' + err.message);
+      }
+      return;
+    }
+
+    // JSON file
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        processDialog(data);
+      } catch(err) {
+        alert('Error parsing JSON: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ZIP extraction using JSZip-compatible minimal approach via native APIs
+  async function extractJsonFromZip(arrayBuf) {
+    // Use the fflate-style approach: parse ZIP central directory
+    // We'll use a minimal ZIP reader that handles standard PKZip format
+    const bytes = new Uint8Array(arrayBuf);
+    const files = parseZipEntries(bytes);
+
+    // Look for dialog.json (could be at root or inside a folder)
+    let target = null;
+    for (const f of files) {
+      const name = f.name.toLowerCase();
+      if (name === 'dialog.json' || name.endsWith('/dialog.json')) {
+        target = f;
+        break;
+      }
+    }
+    // If no dialog.json, look for any .json file
+    if (!target) {
+      for (const f of files) {
+        if (f.name.toLowerCase().endsWith('.json')) {
+          target = f;
+          break;
+        }
+      }
+    }
+    if (!target) throw new Error('No dialog.json or .json file found in the ZIP archive.');
+
+    // Decompress
+    const raw = bytes.slice(target.dataOffset, target.dataOffset + target.compressedSize);
+    if (target.compressionMethod === 0) {
+      // Stored (no compression)
+      return new TextDecoder().decode(raw);
+    } else if (target.compressionMethod === 8) {
+      // Deflate
+      const ds = new DecompressionStream('deflate-raw');
+      const writer = ds.writable.getWriter();
+      const reader = ds.readable.getReader();
+      writer.write(raw);
+      writer.close();
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+      const result = new Uint8Array(totalLen);
+      let offset = 0;
+      for (const c of chunks) { result.set(c, offset); offset += c.length; }
+      return new TextDecoder().decode(result);
+    } else {
+      throw new Error('Unsupported compression method: ' + target.compressionMethod);
+    }
+  }
+
+  function parseZipEntries(bytes) {
+    const entries = [];
+    let i = 0;
+    while (i < bytes.length - 4) {
+      // Local file header signature = 0x04034b50
+      if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x03 && bytes[i+3] === 0x04) {
+        const compressionMethod = bytes[i+8] | (bytes[i+9] << 8);
+        const compressedSize = bytes[i+18] | (bytes[i+19] << 8) | (bytes[i+20] << 16) | (bytes[i+21] << 24);
+        const uncompressedSize = bytes[i+22] | (bytes[i+23] << 8) | (bytes[i+24] << 16) | (bytes[i+25] << 24);
+        const nameLen = bytes[i+26] | (bytes[i+27] << 8);
+        const extraLen = bytes[i+28] | (bytes[i+29] << 8);
+        const name = new TextDecoder().decode(bytes.slice(i+30, i+30+nameLen));
+        const dataOffset = i + 30 + nameLen + extraLen;
+
+        // Handle data descriptor (bit 3 of general purpose flag)
+        const gpFlag = bytes[i+6] | (bytes[i+7] << 8);
+        let actualCompressedSize = compressedSize;
+
+        if ((gpFlag & 0x08) && compressedSize === 0) {
+          // Data descriptor follows the data — scan for next local header or central dir
+          let scanPos = dataOffset;
+          while (scanPos < bytes.length - 4) {
+            if (bytes[scanPos] === 0x50 && bytes[scanPos+1] === 0x4b &&
+                ((bytes[scanPos+2] === 0x03 && bytes[scanPos+3] === 0x04) ||
+                 (bytes[scanPos+2] === 0x01 && bytes[scanPos+3] === 0x02))) {
+              // Check if there's a data descriptor (12 or 16 bytes) before this
+              actualCompressedSize = scanPos - dataOffset;
+              // The data descriptor may have a signature (0x08074b50) — adjust
+              if (actualCompressedSize >= 16 &&
+                  bytes[scanPos-16] === 0x50 && bytes[scanPos-15] === 0x4b &&
+                  bytes[scanPos-14] === 0x07 && bytes[scanPos-13] === 0x08) {
+                actualCompressedSize -= 16;
+              } else if (actualCompressedSize >= 12) {
+                actualCompressedSize -= 12;
+              }
+              break;
+            }
+            scanPos++;
+          }
+          if (scanPos >= bytes.length - 4) actualCompressedSize = bytes.length - dataOffset;
+        }
+
+        if (!name.endsWith('/')) {
+          entries.push({ name, compressionMethod, compressedSize: actualCompressedSize || compressedSize, uncompressedSize, dataOffset });
+        }
+        i = dataOffset + (actualCompressedSize || compressedSize);
+      } else if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x01 && bytes[i+3] === 0x02) {
+        // Central directory — we're done with local headers
+        break;
+      } else {
+        i++;
+      }
+    }
+    return entries;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    try {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    } catch { return ''; }
+  }
+
+  // Get the best available timestamp from an activity
+  function getTs(act) {
+    return act.timestamp || act.localTimestamp || (act.channelData && act.channelData['webchat:internal:received-at']) || '';
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function simpleMarkdown(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+    // Bold
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+    // Lists
+    html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$1. $2</li>');
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^  - (.+)$/gm, '<li style="margin-left:16px">$1</li>');
+    html = html.replace(/^    - (.+)$/gm, '<li style="margin-left:32px">$1</li>');
+    // Paragraphs (consecutive lines without tags)
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+    // Remove citation marks
+    html = html.replace(/citeturn\d+file\d+/g, '');
+    return '<div class="rendered-md"><p>' + html + '</p></div>';
+  }
+
+  function truncate(s, len) {
+    if (!s) return '';
+    if (s.length <= len) return s;
+    return s.substring(0, len) + '...';
+  }
+
+  function classifyActivity(act) {
+    if (act.type === 'message') {
+      if (act.from && act.from.role === 'user') return { cat: 'user-message', badge: 'User Message', badgeCls: 'badge-user' };
+      if (act.from && act.from.role === 'bot') return { cat: 'bot-message', badge: 'Bot Response', badgeCls: 'badge-bot' };
+      if (act.from && act.from.role === 'debug') return { cat: 'info', badge: 'Debug', badgeCls: 'badge-info' };
+      return { cat: 'bot-message', badge: 'Message', badgeCls: 'badge-bot' };
+    }
+    if (act.type === 'typing') return { cat: 'typing', badge: 'Typing/Stream', badgeCls: 'badge-typing' };
+    if (act.type === 'event') {
+      const vt = act.valueType || act.name || '';
+      if (vt === 'DynamicPlanReceived' || vt === 'DynamicPlanReceivedDebug') return { cat: 'plan', badge: 'Plan', badgeCls: 'badge-plan' };
+      if (vt === 'DynamicPlanStepTriggered') return { cat: 'thought', badge: 'Step Triggered', badgeCls: 'badge-thought' };
+      if (vt === 'DynamicPlanStepBindUpdate') return { cat: 'tool', badge: 'Arguments Bound', badgeCls: 'badge-tool' };
+      if (vt === 'DynamicPlanStepFinished') return { cat: 'tool', badge: 'Step Finished', badgeCls: 'badge-tool' };
+      if (vt === 'DynamicPlanFinished') return { cat: 'plan', badge: 'Plan Complete', badgeCls: 'badge-plan' };
+      if (vt === 'UniversalSearchToolTraceData') return { cat: 'search', badge: 'Search', badgeCls: 'badge-search' };
+      if (vt === 'DialogTracingInfo') return { cat: 'info', badge: 'Dialog Trace', badgeCls: 'badge-info' };
+      if (vt === 'GenerativeAnswersSupportData' || act.name === 'GenerativeAnswersSupportData') return { cat: 'info', badge: 'Gen Answers', badgeCls: 'badge-info' };
+      return { cat: 'info', badge: vt || 'Event', badgeCls: 'badge-info' };
+    }
+    return { cat: 'info', badge: act.type || 'Unknown', badgeCls: 'badge-info' };
+  }
+
+  function buildTitle(act, cls) {
+    const vt = act.valueType || '';
+    if (cls.cat === 'user-message') return act.text || 'User message';
+    if (cls.cat === 'bot-message') return truncate(act.text, 120) || 'Bot response';
+    if (cls.cat === 'typing') {
+      if (act.text) return truncate(act.text, 120);
+      return 'Typing indicator';
+    }
+    if (vt === 'DynamicPlanReceived') {
+      const v = act.value || {};
+      const steps = (v.steps || []).join(', ');
+      return 'Plan received: ' + (steps || 'no steps') + (v.isFinalPlan ? ' (final)' : '');
+    }
+    if (vt === 'DynamicPlanReceivedDebug') {
+      const v = act.value || {};
+      return 'Plan debug — Ask: ' + truncate(v.ask, 80);
+    }
+    if (vt === 'DynamicPlanStepTriggered') {
+      const v = act.value || {};
+      return (v.taskDialogId || 'Step') + ' — ' + truncate(v.thought, 100);
+    }
+    if (vt === 'DynamicPlanStepBindUpdate') {
+      const v = act.value || {};
+      return 'Bind arguments for ' + (v.taskDialogId || 'step');
+    }
+    if (vt === 'DynamicPlanStepFinished') {
+      const v = act.value || {};
+      return (v.taskDialogId || 'Step') + ' finished (' + (v.state || '') + ')';
+    }
+    if (vt === 'DynamicPlanFinished') {
+      const v = act.value || {};
+      return 'Plan ' + (v.planId || '').substring(0,8) + '... ' + (v.wasCancelled ? 'CANCELLED' : 'completed');
+    }
+    if (vt === 'UniversalSearchToolTraceData') {
+      const v = act.value || {};
+      const count = ((v.fullResults || []).length) || 
+                    (((v.outputKnowledgeSources || []).length) ? 'sources: ' + v.outputKnowledgeSources.length : '0 results');
+      return 'Search executed — ' + count;
+    }
+    if (vt === 'DialogTracingInfo') {
+      const actions = (act.value && act.value.actions) || [];
+      if (actions.length === 0) return 'Dialog trace (no actions)';
+      return 'Dialog trace: ' + actions.map(a => a.actionType + ' (' + a.topicId.split('.').pop() + ')').join(', ');
+    }
+    if (act.name === 'GenerativeAnswersSupportData') {
+      const v = act.value || {};
+      return 'Generative answers: ' + (v.gptAnswerState || v.completionState || 'unknown');
+    }
+    return vt || act.name || act.type || 'Activity';
+  }
+
+  function buildDetail(act, cls) {
+    const vt = act.valueType || '';
+    let html = '';
+
+    // Timestamp
+    const ts = getTs(act);
+    if (ts) {
+      html += '<div class="detail-section"><h4>Timestamp</h4><div class="detail-content">' + escapeHtml(String(ts)) + '</div></div>';
+    }
+
+    // From
+    if (act.from) {
+      html += '<div class="detail-section"><h4>From</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Name</span><span class="kv-val">' + escapeHtml(act.from.name || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Role</span><span class="kv-val">' + escapeHtml(act.from.role || '') + '</span></div>';
+      html += '</div></div>';
+    }
+
+    // Message text
+    if (act.text && (cls.cat === 'user-message' || cls.cat === 'bot-message')) {
+      html += '<div class="detail-section"><h4>Message Content</h4><div class="detail-content message-text">' + simpleMarkdown(act.text) + '</div></div>';
+    }
+    if (act.speak) {
+      html += '<div class="detail-section"><h4>Speak Text (TTS)</h4><div class="detail-content">' + escapeHtml(act.speak) + '</div></div>';
+    }
+
+    // Typing with text
+    if (cls.cat === 'typing' && act.text) {
+      html += '<div class="detail-section"><h4>Streaming Content</h4><div class="detail-content message-text">' + simpleMarkdown(act.text) + '</div></div>';
+    }
+
+    // Plan Received
+    if (vt === 'DynamicPlanReceived') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Plan Details</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Plan ID</span><span class="kv-val"><code>' + escapeHtml(v.planIdentifier || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Is Final Plan</span><span class="kv-val">' + v.isFinalPlan + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Steps</span><span class="kv-val">' + escapeHtml((v.steps || []).join(', ')) + '</span></div>';
+      if (v.parentPlanIdentifier) {
+        html += '<div class="kv-row"><span class="kv-key">Parent Plan</span><span class="kv-val"><code>' + escapeHtml(v.parentPlanIdentifier) + '</code></span></div>';
+      }
+      if (v.toolDefinitions && v.toolDefinitions.length) {
+        html += '</div></div><div class="detail-section"><h4>Tool Definitions</h4><div class="detail-content">';
+        v.toolDefinitions.forEach(td => {
+          html += '<div style="margin-bottom:8px;padding:8px;background:var(--bg);border-radius:4px;">';
+          html += '<div class="kv-row"><span class="kv-key">Display Name</span><span class="kv-val"><strong>' + escapeHtml(td.displayName || '') + '</strong></span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Description</span><span class="kv-val">' + escapeHtml(td.description || '') + '</span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Schema</span><span class="kv-val"><code>' + escapeHtml(td.schemaName || '') + '</code></span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Kind</span><span class="kv-val">' + escapeHtml(td.toolKind || '') + '</span></div>';
+          if (td.outputs && td.outputs.length) {
+            html += '<div class="kv-row"><span class="kv-key">Outputs</span><span class="kv-val">' + td.outputs.map(o => escapeHtml(o.name)).join(', ') + '</span></div>';
+          }
+          html += '</div>';
+        });
+      }
+      html += '</div></div>';
+    }
+
+    // Plan Debug
+    if (vt === 'DynamicPlanReceivedDebug') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Plan Debug Info</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">User Ask</span><span class="kv-val">' + escapeHtml(v.ask || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Summary</span><span class="kv-val">' + escapeHtml(v.summary || '(empty)') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Plan ID</span><span class="kv-val"><code>' + escapeHtml(v.planIdentifier || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Is Final</span><span class="kv-val">' + v.isFinalPlan + '</span></div>';
+      html += '</div></div>';
+    }
+
+    // Step Triggered
+    if (vt === 'DynamicPlanStepTriggered') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Step Details</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Task/Agent</span><span class="kv-val"><code>' + escapeHtml(v.taskDialogId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Step ID</span><span class="kv-val"><code>' + escapeHtml(v.stepId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">State</span><span class="kv-val">' + escapeHtml(v.state || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Type</span><span class="kv-val">' + escapeHtml(v.type || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Plan ID</span><span class="kv-val"><code>' + escapeHtml(v.planIdentifier || '') + '</code></span></div>';
+      html += '</div></div>';
+      if (v.thought) {
+        html += '<div class="detail-section"><h4>AI Thought / Reasoning</h4><div class="detail-content" style="border-left:3px solid var(--orange);padding-left:12px;font-style:italic;">' + escapeHtml(v.thought) + '</div></div>';
+      }
+    }
+
+    // Step Bind
+    if (vt === 'DynamicPlanStepBindUpdate') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Binding Details</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Task/Agent</span><span class="kv-val"><code>' + escapeHtml(v.taskDialogId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Step ID</span><span class="kv-val"><code>' + escapeHtml(v.stepId || '') + '</code></span></div>';
+      if (v.autoFilledArguments) {
+        html += '<div class="kv-row"><span class="kv-key">Auto-filled</span><span class="kv-val">' + escapeHtml(v.autoFilledArguments.join(', ')) + '</span></div>';
+      }
+      html += '</div></div>';
+      if (v.arguments) {
+        html += '<div class="detail-section"><h4>Arguments</h4><div class="detail-content">';
+        for (const [k, val] of Object.entries(v.arguments)) {
+          const display = typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val);
+          html += '<div class="kv-row"><span class="kv-key">' + escapeHtml(k) + '</span><span class="kv-val">' + simpleMarkdown(display) + '</span></div>';
+        }
+        html += '</div></div>';
+      }
+    }
+
+    // Step Finished
+    if (vt === 'DynamicPlanStepFinished') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Step Result</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Task/Agent</span><span class="kv-val"><code>' + escapeHtml(v.taskDialogId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">State</span><span class="kv-val" style="color:var(--green);font-weight:600;">' + escapeHtml(v.state || '') + '</span></div>';
+      if (v.executionTime) {
+        html += '<div class="kv-row"><span class="kv-key">Execution Time</span><span class="kv-val">' + escapeHtml(v.executionTime) + '</span></div>';
+      }
+      html += '</div></div>';
+      if (v.observation) {
+        html += '<div class="detail-section"><h4>Observation / Output</h4><div class="detail-content">';
+        if (v.observation.search_result && v.observation.search_result.search_results) {
+          const results = v.observation.search_result.search_results;
+          html += '<div style="margin-bottom:8px;color:var(--text-muted);">' + results.length + ' search results returned</div>';
+          results.forEach((r, i) => {
+            html += '<div class="search-result-item">';
+            html += '<div class="sr-name">' + (i+1) + '. ' + escapeHtml(r.Name || '') + '</div>';
+            html += '<div class="sr-type">' + escapeHtml(r.FileType || '') + ' — ' + escapeHtml(r.Type || '') + '</div>';
+            html += '<div class="sr-text">' + escapeHtml(truncate(r.Text || '', 300)) + '</div>';
+            html += '</div>';
+          });
+        } else if (typeof v.observation === 'object') {
+          for (const [ok, ov] of Object.entries(v.observation)) {
+            if (ok === 'downloaded_files') continue;
+            const display = typeof ov === 'string' ? ov : JSON.stringify(ov, null, 2);
+            html += '<div style="margin-bottom:8px;"><strong style="color:var(--accent);">' + escapeHtml(ok) + '</strong></div>';
+            html += '<div style="max-height:300px;overflow:auto;">' + simpleMarkdown(display) + '</div>';
+          }
+        }
+        html += '</div></div>';
+      }
+    }
+
+    // Plan Finished
+    if (vt === 'DynamicPlanFinished') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Plan Completion</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Plan ID</span><span class="kv-val"><code>' + escapeHtml(v.planId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Cancelled</span><span class="kv-val">' + v.wasCancelled + '</span></div>';
+      html += '</div></div>';
+    }
+
+    // Search Tool Trace
+    if (vt === 'UniversalSearchToolTraceData') {
+      const v = act.value || {};
+      html += '<div class="detail-section"><h4>Search Trace</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">Tool ID</span><span class="kv-val"><code>' + escapeHtml(v.toolId || '') + '</code></span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Knowledge Sources</span><span class="kv-val">' + escapeHtml((v.knowledgeSources || []).join(', ')) + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Output Sources</span><span class="kv-val">' + escapeHtml((v.outputKnowledgeSources || []).join(', ')) + '</span></div>';
+      html += '</div></div>';
+    }
+
+    // Dialog Tracing
+    if (vt === 'DialogTracingInfo') {
+      const actions = (act.value && act.value.actions) || [];
+      if (actions.length) {
+        html += '<div class="detail-section"><h4>Dialog Actions (' + actions.length + ')</h4><div class="detail-content">';
+        actions.forEach((a, i) => {
+          html += '<div style="margin-bottom:8px;padding:8px;background:var(--bg);border-radius:4px;">';
+          html += '<div class="kv-row"><span class="kv-key">Action</span><span class="kv-val"><strong>' + escapeHtml(a.actionType || '') + '</strong></span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Action ID</span><span class="kv-val"><code>' + escapeHtml(a.actionId || '') + '</code></span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Topic</span><span class="kv-val"><code>' + escapeHtml(a.topicId || '') + '</code></span></div>';
+          html += '<div class="kv-row"><span class="kv-key">Trigger</span><span class="kv-val">' + escapeHtml(a.triggerId || '') + '</span></div>';
+          if (a.exception) {
+            html += '<div class="kv-row"><span class="kv-key" style="color:var(--red);">Exception</span><span class="kv-val" style="color:var(--red);">' + escapeHtml(a.exception) + '</span></div>';
+          }
+          if (a.resultTrace && Object.keys(a.resultTrace).length) {
+            html += '<div class="kv-row"><span class="kv-key">Result Trace</span><span class="kv-val"><pre style="margin:0;">' + escapeHtml(JSON.stringify(a.resultTrace, null, 2)) + '</pre></span></div>';
+          }
+          if (a.variableState) {
+            const ds = a.variableState.dialogState || {};
+            const gs = a.variableState.globalState || {};
+            if (Object.keys(ds).length || Object.keys(gs).length) {
+              html += '<div class="kv-row"><span class="kv-key">Variables</span><span class="kv-val"><pre style="margin:0;">' + escapeHtml(JSON.stringify(a.variableState, null, 2)) + '</pre></span></div>';
+            }
+          }
+          html += '</div>';
+        });
+        html += '</div></div>';
+      }
+    }
+
+    // Generative Answers
+    if (act.name === 'GenerativeAnswersSupportData' && act.value) {
+      const v = act.value;
+      html += '<div class="detail-section"><h4>Generative Answers Debug</h4><div class="detail-content">';
+      html += '<div class="kv-row"><span class="kv-key">GPT Answer State</span><span class="kv-val">' + escapeHtml(v.gptAnswerState || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Completion State</span><span class="kv-val">' + escapeHtml(v.completionState || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Message</span><span class="kv-val">' + escapeHtml(v.message || '') + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Triggered Fallback</span><span class="kv-val">' + v.triggeredGptFallback + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Content Moderation</span><span class="kv-val">' + v.performedContentModerationCheck + '</span></div>';
+      html += '<div class="kv-row"><span class="kv-key">Content Provenance</span><span class="kv-val">' + v.performedContentProvenanceCheck + '</span></div>';
+      html += '</div></div>';
+    }
+
+    // Citations
+    if (act.entities) {
+      const citations = [];
+      act.entities.forEach(ent => {
+        if (ent.citation) citations.push(...ent.citation);
+      });
+      if (citations.length) {
+        html += '<div class="detail-section"><h4>Citations</h4><div class="detail-content">';
+        citations.forEach(c => {
+          const app = c.appearance || {};
+          html += '<div class="search-result-item">';
+          html += '<div class="sr-name">' + escapeHtml(app.name || app.abstract || '') + '</div>';
+          if (app.url) html += '<div class="sr-type">' + escapeHtml(truncate(app.url, 100)) + '</div>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      }
+    }
+
+    // Auto-render unknown event types as KV table
+    const knownVTs = ['DynamicPlanReceived','DynamicPlanReceivedDebug','DynamicPlanStepTriggered','DynamicPlanStepBindUpdate','DynamicPlanStepFinished','DynamicPlanFinished','UniversalSearchToolTraceData','DialogTracingInfo','GenerativeAnswersSupportData'];
+    if (act.type === 'event' && act.value && typeof act.value === 'object' && !knownVTs.includes(vt) && vt !== '') {
+      html += '<div class="detail-section"><h4>Event Data (' + escapeHtml(vt) + ')</h4><div class="detail-content auto-kv-section">';
+      html += renderAutoKV(act.value);
+      html += '</div></div>';
+    } else if (act.type === 'event' && act.value && typeof act.value === 'object' && !vt && !knownVTs.includes(act.name || '')) {
+      html += '<div class="detail-section"><h4>Event Data</h4><div class="detail-content auto-kv-section">';
+      html += renderAutoKV(act.value);
+      html += '</div></div>';
+    }
+
+    // Raw JSON toggle
+    html += '<div class="detail-section"><h4 style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle(\'hidden\')">&#9654; Raw JSON (click to expand)</h4><div class="detail-content hidden" style="max-height:400px;overflow:auto;font-family:monospace;font-size:11px;">' + escapeHtml(JSON.stringify(act, null, 2)) + '</div></div>';
+
+    return html;
+  }
+
+  // Recursively render any value object as a readable KV tree
+  function renderAutoKV(obj, depth) {
+    depth = depth || 0;
+    if (obj === null || obj === undefined) return '<span class="auto-kv-val">(null)</span>';
+    if (typeof obj !== 'object') return '<span class="auto-kv-val">' + escapeHtml(String(obj)) + '</span>';
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) return '<span class="auto-kv-val">(empty array)</span>';
+      let h = '';
+      obj.forEach((item, i) => {
+        if (typeof item === 'object' && item !== null) {
+          h += '<span class="auto-kv-key" style="margin-left:' + (depth*12) + 'px">[' + i + ']</span>';
+          h += renderAutoKV(item, depth + 1);
+        } else {
+          h += '<span class="auto-kv-val" style="margin-left:' + (depth*12) + 'px">[' + i + '] ' + escapeHtml(String(item)) + '</span>';
+        }
+      });
+      return h;
+    }
+    let h = '';
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === 'object') {
+        h += '<span class="auto-kv-key" style="margin-left:' + (depth*12) + 'px">' + escapeHtml(k) + '</span>';
+        h += renderAutoKV(v, depth + 1);
+      } else {
+        const display = v === null || v === undefined ? '(null)' : String(v);
+        h += '<div style="margin-left:' + (depth*12) + 'px"><span class="auto-kv-key" style="display:inline;margin-right:6px">' + escapeHtml(k) + ':</span><span class="auto-kv-val" style="display:inline">' + escapeHtml(display) + '</span></div>';
+      }
+    }
+    return h;
+  }
+
+  function resetViewer() {
+    viewer.classList.add('hidden');
+    uploadZone.classList.remove('hidden');
+    toolbar.innerHTML = '';
+    convInfo.innerHTML = '';
+    statsPanel.innerHTML = '';
+    statsPanel.classList.add('hidden');
+    errorBanner.innerHTML = '';
+    errorBanner.classList.add('hidden');
+    breadcrumbBar.innerHTML = '';
+    breadcrumbBar.classList.add('empty');
+    filterBar.innerHTML = '';
+    timeline.innerHTML = '';
+    compareView.innerHTML = '';
+    compareView.classList.add('hidden');
+    chatMessages.innerHTML = '';
+    chatPane.classList.add('hidden');
+    resizeHandle.classList.add('hidden');
+    chatPane.style.width = '';
+    fileInput.value = '';
+    currentFileName = '';
+    lastLoadedData = null;
+    if (scrollCleanup) { scrollCleanup(); scrollCleanup = null; }
+  }
+
+  function processDialog(data) {
+    const activities = data.activities || [];
+    if (!activities.length) { alert('No activities found in file.'); return; }
+
+    lastLoadedData = data;
+
+    uploadZone.classList.add('hidden');
+    viewer.classList.remove('hidden');
+
+    // Build toolbar: file name, expand/collapse all, re-upload
+    toolbar.innerHTML = '';
+    if (currentFileName) {
+      const fnSpan = document.createElement('span');
+      fnSpan.className = 'file-name';
+      fnSpan.textContent = currentFileName;
+      toolbar.appendChild(fnSpan);
+    }
+    const spacer = document.createElement('span');
+    spacer.className = 'toolbar-spacer';
+    toolbar.appendChild(spacer);
+
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'toolbar-btn';
+    expandBtn.innerHTML = '&#9660; Expand All';
+    expandBtn.addEventListener('click', () => {
+      timeline.querySelectorAll('.plan-group.collapsed').forEach(pg => pg.classList.remove('collapsed'));
+      timeline.querySelectorAll('.step:not(.expanded)').forEach(s => s.classList.add('expanded'));
+    });
+    toolbar.appendChild(expandBtn);
+
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'toolbar-btn';
+    collapseBtn.innerHTML = '&#9650; Collapse All';
+    collapseBtn.addEventListener('click', () => {
+      timeline.querySelectorAll('.plan-group:not(.collapsed)').forEach(pg => pg.classList.add('collapsed'));
+      timeline.querySelectorAll('.step.expanded').forEach(s => s.classList.remove('expanded'));
+    });
+    toolbar.appendChild(collapseBtn);
+
+    const reuploadBtn = document.createElement('button');
+    reuploadBtn.className = 'toolbar-btn primary';
+    reuploadBtn.innerHTML = '&#8635; Load another file';
+    reuploadBtn.addEventListener('click', () => resetViewer());
+    toolbar.appendChild(reuploadBtn);
+
+    // Export button
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'toolbar-btn';
+    exportBtn.innerHTML = '&#128196; Export HTML';
+    exportBtn.addEventListener('click', () => exportToHtml());
+    toolbar.appendChild(exportBtn);
+
+    // Compare button
+    const compareBtn = document.createElement('button');
+    compareBtn.className = 'toolbar-btn';
+    compareBtn.innerHTML = '&#8596; Compare';
+    compareBtn.addEventListener('click', () => enterCompareMode(data));
+    toolbar.appendChild(compareBtn);
+
+    // Search box
+    const searchBox = document.createElement('div');
+    searchBox.className = 'search-box';
+    searchBox.innerHTML = '<span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="Search steps..."><span class="search-count" id="search-count"></span>';
+    // Insert before spacer
+    toolbar.insertBefore(searchBox, spacer);
+
+    const searchInput = document.getElementById('search-input');
+    const searchCount = document.getElementById('search-count');
+    let searchDebounce = null;
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => applySearch(searchInput.value.trim()), 150);
+    });
+
+    function applySearch(query) {
+      // Reset all previous search state
+      timeline.querySelectorAll('.search-hidden').forEach(el => el.classList.remove('search-hidden'));
+      timeline.querySelectorAll('.search-highlight').forEach(el => {
+        el.replaceWith(el.textContent);
+      });
+
+      if (!query) {
+        searchCount.textContent = '';
+        // Re-apply active filter when clearing search
+        if (activeFilter !== 'all') {
+          timeline.querySelectorAll('.step').forEach(s => {
+            if (s.dataset.cat === activeFilter) s.classList.remove('hidden');
+            else s.classList.add('hidden');
+          });
+          timeline.querySelectorAll('.plan-group').forEach(pg => {
+            if (activeFilter === 'plan') { pg.classList.remove('hidden'); }
+            else {
+              const hasVisible = pg.querySelector('.step:not(.hidden)');
+              if (hasVisible) pg.classList.remove('hidden');
+              else pg.classList.add('hidden');
+            }
+          });
+        }
+        return;
+      }
+
+      const lq = query.toLowerCase();
+      let matchCount = 0;
+      const allSteps = timeline.querySelectorAll('.step');
+
+      allSteps.forEach(stepEl => {
+        const titleEl = stepEl.querySelector('.step-title');
+        const detailEl = stepEl.querySelector('.step-detail');
+        const titleText = titleEl ? titleEl.textContent : '';
+        const detailText = detailEl ? detailEl.textContent : '';
+        const badges = stepEl.querySelectorAll('.step-badge, .plan-pill');
+        let badgeText = '';
+        badges.forEach(b => badgeText += ' ' + b.textContent);
+
+        const fullText = (titleText + ' ' + badgeText + ' ' + detailText).toLowerCase();
+
+        if (fullText.includes(lq)) {
+          matchCount++;
+          stepEl.classList.remove('search-hidden');
+          // Highlight in title
+          if (titleEl && titleText.toLowerCase().includes(lq)) {
+            highlightTextInEl(titleEl, query);
+          }
+        } else {
+          stepEl.classList.add('search-hidden');
+        }
+      });
+
+      // Show/hide plan groups based on whether they have visible children
+      timeline.querySelectorAll('.plan-group').forEach(pg => {
+        const hasVisible = pg.querySelector('.step:not(.search-hidden)');
+        if (hasVisible) pg.classList.remove('search-hidden');
+        else pg.classList.add('search-hidden');
+      });
+
+      searchCount.textContent = matchCount + ' match' + (matchCount !== 1 ? 'es' : '');
+    }
+
+    function highlightTextInEl(el, query) {
+      const text = el.textContent;
+      const lowerText = text.toLowerCase();
+      const lq = query.toLowerCase();
+      const idx = lowerText.indexOf(lq);
+      if (idx === -1) return;
+      const before = text.substring(0, idx);
+      const match = text.substring(idx, idx + query.length);
+      const after = text.substring(idx + query.length);
+      el.innerHTML = escapeHtml(before) + '<span class="search-highlight">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+    }
+
+    // Extract conversation info
+    const firstMsg = activities.find(a => a.type === 'message' && a.from && a.from.role === 'bot');
+    const userMsg = activities.find(a => a.type === 'message' && a.from && a.from.role === 'user');
+    const botName = firstMsg ? (firstMsg.from.name || 'Bot') : 'Bot';
+    const convId = (firstMsg && firstMsg.conversation) ? firstMsg.conversation.id : '';
+    // Find actual first and last timestamps (fall back to localTimestamp)
+    let firstTs = '', lastTs = '';
+    for (let i = 0; i < activities.length; i++) {
+      const t = getTs(activities[i]);
+      if (t) { firstTs = t; break; }
+    }
+    for (let i = activities.length - 1; i >= 0; i--) {
+      const t = getTs(activities[i]);
+      if (t) { lastTs = t; break; }
+    }
+
+    convInfo.innerHTML = '';
+    [
+      ['Bot Name', botName],
+      ['Conversation ID', convId ? convId.substring(0,18) + '...' : ''],
+      ['Activities', activities.length],
+      ['Start', formatTime(firstTs)],
+      ['End', formatTime(lastTs)],
+      ['Channel', firstMsg ? firstMsg.channelId : ''],
+    ].forEach(([label, value]) => {
+      const div = document.createElement('div');
+      div.className = 'info-item';
+      div.innerHTML = '<label>' + label + '</label><span>' + escapeHtml(String(value)) + '</span>';
+      convInfo.appendChild(div);
+    });
+
+    // Build steps + detect errors/warnings
+    const steps = [];
+    const catCounts = {};
+    const issues = []; // { type: 'error'|'warning'|'cancelled', title, stepIndex, activityRef }
+    let activeFilter = 'all';
+    activities.forEach((act, i) => {
+      const cls = classifyActivity(act);
+      const title = buildTitle(act, cls);
+      catCounts[cls.cat] = (catCounts[cls.cat] || 0) + 1;
+      steps.push({ act, cls, title, index: i });
+
+      // Detect errors and warnings
+      const vt = act.valueType || act.name || '';
+      // Cancelled plans
+      if (vt === 'DynamicPlanFinished' && act.value && act.value.wasCancelled) {
+        issues.push({ type: 'cancelled', title: 'Plan cancelled: ' + (act.value.planId || '').substring(0,8) + '...', stepIndex: i, activityRef: act });
+      }
+      // DialogTracingInfo with exceptions
+      if (vt === 'DialogTracingInfo' && act.value && act.value.actions) {
+        act.value.actions.forEach(a => {
+          if (a.exception) {
+            issues.push({ type: 'error', title: 'Exception in ' + (a.actionType || 'action') + ': ' + truncate(a.exception, 80), stepIndex: i, activityRef: act });
+          }
+        });
+      }
+      // GenerativeAnswers with fallback triggered
+      if ((vt === 'GenerativeAnswersSupportData' || act.name === 'GenerativeAnswersSupportData') && act.value) {
+        if (act.value.triggeredGptFallback === true || act.value.triggeredGptFallback === 'true') {
+          issues.push({ type: 'warning', title: 'GPT fallback triggered — ' + (act.value.gptAnswerState || ''), stepIndex: i, activityRef: act });
+        }
+        if (act.value.gptAnswerState === 'GptAnswerNotFound') {
+          issues.push({ type: 'warning', title: 'GPT answer not found', stepIndex: i, activityRef: act });
+        }
+      }
+      // Step finished with error state
+      if (vt === 'DynamicPlanStepFinished' && act.value) {
+        const state = (act.value.state || '').toLowerCase();
+        if (state === 'error' || state === 'failed' || state === 'faulted') {
+          issues.push({ type: 'error', title: (act.value.taskDialogId || 'Step') + ' finished with ' + act.value.state, stepIndex: i, activityRef: act });
+        }
+      }
+      // Debug messages that are errors
+      if (act.from && act.from.role === 'debug' && act.text && /error|exception|fail/i.test(act.text)) {
+        issues.push({ type: 'error', title: 'Debug: ' + truncate(act.text, 80), stepIndex: i, activityRef: act });
+      }
+    });
+
+    // Build error banner
+    errorBanner.innerHTML = '';
+    if (issues.length > 0) {
+      errorBanner.classList.remove('hidden');
+      const heading = document.createElement('h3');
+      heading.innerHTML = '&#9888; ' + issues.length + ' issue' + (issues.length > 1 ? 's' : '') + ' detected';
+      errorBanner.appendChild(heading);
+
+      issues.forEach(issue => {
+        const item = document.createElement('div');
+        item.className = 'error-item';
+        const badgeCls = issue.type === 'error' ? 'error-badge-error' : issue.type === 'warning' ? 'error-badge-warning' : 'error-badge-cancelled';
+        item.innerHTML = '<span class="error-badge ' + badgeCls + '">' + escapeHtml(issue.type) + '</span><span>' + escapeHtml(issue.title) + '</span>';
+        item.addEventListener('click', () => {
+          // Find the step DOM element by matching the activity reference
+          const allSteps = timeline.querySelectorAll('.step');
+          let targetStep = null;
+          for (const s of allSteps) {
+            if (s._actRef === issue.activityRef) { targetStep = s; break; }
+          }
+          if (targetStep) {
+            // Uncollapse parent plan groups
+            let parent = targetStep.parentElement;
+            while (parent && parent !== timeline) {
+              if (parent.classList.contains('plan-group-children')) {
+                const planGroup = parent.closest('.plan-group');
+                if (planGroup) planGroup.classList.remove('collapsed');
+              }
+              parent = parent.parentElement;
+            }
+            targetStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetStep.classList.add('expanded');
+            // Brief flash highlight
+            targetStep.style.outline = '2px solid var(--red)';
+            setTimeout(() => { targetStep.style.outline = ''; }, 2000);
+          }
+        });
+        errorBanner.appendChild(item);
+      });
+    } else {
+      errorBanner.classList.add('hidden');
+    }
+
+    // Build filter bar
+    filterBar.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.className = 'filter-btn active';
+    allBtn.innerHTML = 'All <span class="count">' + steps.length + '</span>';
+    allBtn.dataset.filter = 'all';
+    filterBar.appendChild(allBtn);
+
+    const catLabels = {
+      'user-message': 'User Messages',
+      'bot-message': 'Bot Responses',
+      'plan': 'Plans',
+      'thought': 'Thoughts',
+      'tool': 'Tool Steps',
+      'search': 'Search',
+      'info': 'Dialog Trace',
+      'typing': 'Typing/Stream',
+    };
+    for (const [cat, label] of Object.entries(catLabels)) {
+      if (!catCounts[cat]) continue;
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn';
+      btn.innerHTML = label + ' <span class="count">' + catCounts[cat] + '</span>';
+      btn.dataset.filter = cat;
+      filterBar.appendChild(btn);
+    }
+
+    filterBar.addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      filterBar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filter;
+      activeFilter = f;
+      // Show/hide individual steps
+      timeline.querySelectorAll('.step').forEach(s => {
+        if (f === 'all' || s.dataset.cat === f) s.classList.remove('hidden');
+        else s.classList.add('hidden');
+      });
+      // Show/hide plan groups: show if any child is visible, or if filter is 'all' or 'plan'
+      timeline.querySelectorAll('.plan-group').forEach(pg => {
+        if (f === 'all' || f === 'plan') {
+          pg.classList.remove('hidden');
+        } else {
+          const hasVisible = pg.querySelector('.step:not(.hidden)');
+          if (hasVisible) pg.classList.remove('hidden');
+          else pg.classList.add('hidden');
+        }
+      });
+    });
+
+    // === FIRST PASS: Build plan registry from all DynamicPlanReceived events ===
+    const planRegistry = {}; // planId -> { displayName, parentPlanId, parentStepId, steps, depth, colorIndex }
+    let colorCounter = 0;
+    activities.forEach(act => {
+      if (act.valueType === 'DynamicPlanReceived' && act.value) {
+        const v = act.value;
+        const planId = v.planIdentifier;
+        if (!planId) return;
+        let displayName = 'Plan';
+        if (v.toolDefinitions && v.toolDefinitions.length) {
+          displayName = v.toolDefinitions.map(t => t.displayName || t.schemaName).join(', ');
+        } else if (v.steps && v.steps.length) {
+          displayName = v.steps.map(s => { const p = s.split('.'); return p[p.length-1] || s; }).join(', ');
+        }
+        planRegistry[planId] = {
+          displayName,
+          parentPlanId: v.parentPlanIdentifier || null,
+          parentStepId: v.parentPlanStepIdentifier || null,
+          steps: v.steps || [],
+          colorIndex: colorCounter++,
+        };
+      }
+    });
+    // Compute depth for each plan
+    function getPlanDepth(planId) {
+      let depth = 0;
+      let cur = planId;
+      while (planRegistry[cur] && planRegistry[cur].parentPlanId) {
+        depth++;
+        cur = planRegistry[cur].parentPlanId;
+      }
+      return depth;
+    }
+    for (const pid of Object.keys(planRegistry)) {
+      planRegistry[pid].depth = getPlanDepth(pid);
+    }
+
+    // Helper: get short name for a planId
+    function planShortName(planId) {
+      if (planRegistry[planId]) return planRegistry[planId].displayName;
+      return planId ? planId.substring(0,8) + '...' : '';
+    }
+    // Helper: get color class for a plan
+    function planColorClass(planId) {
+      if (!planRegistry[planId]) return 'plan-pill-0';
+      return 'plan-pill-' + (planRegistry[planId].colorIndex % 5);
+    }
+    // Helper: build ancestry string
+    function planAncestry(planId) {
+      const info = planRegistry[planId];
+      if (!info || !info.parentPlanId) return '';
+      const parentName = planShortName(info.parentPlanId);
+      return 'child of ' + parentName;
+    }
+
+    // Helper: get the plan affiliation for an activity (from value.planIdentifier)
+    // For DynamicPlanStepTriggered/StepFinished, planIdentifier = the DIRECT plan
+    // For DynamicPlanStepBindUpdate, planIdentifier often points to root — use stepId to find correct plan
+    function getActivityPlanAffiliation(act) {
+      if (!act.value) return null;
+      const vt = act.valueType || '';
+      // StepTriggered and StepFinished have reliable planIdentifier
+      if (vt === 'DynamicPlanStepTriggered' || vt === 'DynamicPlanStepFinished') {
+        return act.value.planIdentifier || null;
+      }
+      // BindUpdate: try stepId lookup — if the stepId matches a StepTriggered, use that plan
+      if (vt === 'DynamicPlanStepBindUpdate') {
+        const stepId = act.value.stepId;
+        if (stepId && stepToPlanMap[stepId]) return stepToPlanMap[stepId];
+        return act.value.planIdentifier || null;
+      }
+      // Search trace, etc.
+      if (act.value.planIdentifier) return act.value.planIdentifier;
+      if (act.value.toolId) {
+        // Check if we're inside a plan on the stack
+        return null; // will use stack position
+      }
+      return null;
+    }
+
+    // Build stepId -> planId map from DynamicPlanStepTriggered events
+    const stepToPlanMap = {};
+    activities.forEach(act => {
+      if (act.valueType === 'DynamicPlanStepTriggered' && act.value) {
+        stepToPlanMap[act.value.stepId] = act.value.planIdentifier;
+      }
+    });
+
+    // === SECOND PASS: Build the tree ===
+    timeline.innerHTML = '';
+
+    function createStepEl(act, cls, title, affiliatedPlanId, activityIndex) {
+      const step = document.createElement('div');
+      step.className = 'step type-' + cls.cat;
+      step.dataset.cat = cls.cat;
+      step._actRef = act; // reference for error banner jump-to
+      const ts = getTs(act);
+
+      // Build plan pill HTML if this step has a plan affiliation
+      let pillHtml = '';
+      if (affiliatedPlanId && planRegistry[affiliatedPlanId]) {
+        const pName = planShortName(affiliatedPlanId);
+        const pColor = planColorClass(affiliatedPlanId);
+        pillHtml = `<span class="plan-pill ${pColor}" title="Plan: ${escapeHtml(affiliatedPlanId)}">${escapeHtml(pName)}</span>`;
+      }
+
+      // Duration calculation: time elapsed since previous activity
+      let durationHtml = '';
+      const actTs = getTs(act);
+      if (activityIndex > 0 && actTs) {
+        const prevTs = getTs(activities[activityIndex - 1]);
+        if (prevTs) {
+          const diffMs = new Date(actTs) - new Date(prevTs);
+          if (diffMs >= 0 && diffMs < 600000) { // < 10 min (skip gaps between turns)
+            const diffSec = diffMs / 1000;
+            let barWidth = Math.min(60, Math.max(2, diffMs / 100)); // scale: 100ms = 1px
+            let barClass = 'duration-bar';
+            if (diffSec > 5) barClass += ' very-slow';
+            else if (diffSec > 2) barClass += ' slow';
+            let label;
+            if (diffMs < 1000) label = diffMs + 'ms';
+            else if (diffSec < 60) label = diffSec.toFixed(1) + 's';
+            else label = (diffSec / 60).toFixed(1) + 'm';
+            durationHtml = `<span class="step-duration"><span class="${barClass}" style="width:${barWidth}px"></span>${label}</span>`;
+          }
+        }
+      }
+
+      step.innerHTML = `
+        <div class="dot"></div>
+        <div class="step-card">
+          <div class="step-header">
+            <span class="step-badge ${cls.badgeCls}">${cls.badge}</span>
+            ${pillHtml}
+            <span class="step-title">${escapeHtml(title)}</span>
+            ${durationHtml}
+            <span class="step-time">${formatTime(ts)}</span>
+            <button class="step-copy" title="Copy to clipboard">&#128203;</button>
+            <span class="step-chevron">&#9654;</span>
+          </div>
+          <div class="step-detail">${buildDetail(act, cls)}</div>
+        </div>
+      `;
+      // Copy button
+      step.querySelector('.step-copy').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const copyBtn = step.querySelector('.step-copy');
+        const copyData = {
+          type: act.type,
+          valueType: act.valueType || act.name || '',
+          title: title,
+          timestamp: act.timestamp || '',
+          from: act.from ? { name: act.from.name, role: act.from.role } : null,
+          text: act.text || undefined,
+          value: act.value || undefined,
+        };
+        navigator.clipboard.writeText(JSON.stringify(copyData, null, 2)).then(() => {
+          copyBtn.classList.add('copied');
+          copyBtn.innerHTML = '&#10003;';
+          setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = '&#128203;'; }, 1500);
+        }).catch(() => {
+          // Fallback: copy title + raw JSON
+          const fallback = title + '\n\n' + JSON.stringify(act, null, 2);
+          const ta = document.createElement('textarea');
+          ta.value = fallback;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          copyBtn.classList.add('copied');
+          copyBtn.innerHTML = '&#10003;';
+          setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = '&#128203;'; }, 1500);
+        });
+      });
+      step.querySelector('.step-header').addEventListener('click', () => {
+        step.classList.toggle('expanded');
+      });
+      return step;
+    }
+
+    // Stack-based plan grouping
+    const planStack = [];
+    const planGroupMap = {};  // planId -> plan-group element
+    const planChildCount = {};
+    // Also track open plan containers by planId for smart placement
+    const openPlanContainers = {}; // planId -> children div
+
+    function getCurrentContainer() {
+      if (planStack.length > 0) return planStack[planStack.length - 1].container;
+      return timeline;
+    }
+
+    // Find the best container for an activity based on its plan affiliation
+    function getBestContainer(affiliatedPlanId) {
+      // If the activity's plan is currently open, place it there
+      if (affiliatedPlanId && openPlanContainers[affiliatedPlanId]) {
+        return openPlanContainers[affiliatedPlanId];
+      }
+      // Otherwise use the stack top (chronological position)
+      return getCurrentContainer();
+    }
+
+    steps.forEach(({ act, cls, title, index: activityIndex }, stepIdx) => {
+      const vt = act.valueType || '';
+
+      // --- TURN SEPARATOR: User messages break out of any open plans ---
+      if (cls.cat === 'user-message' && planStack.length > 0) {
+        // Force-close all open plan groups (mark as "open-ended")
+        while (planStack.length > 0) {
+          const p = planStack.pop();
+          const groupEl = planGroupMap[p.planId];
+          if (groupEl) {
+            const statusEl = groupEl.querySelector('.plan-status');
+            if (statusEl && statusEl.textContent === 'running') {
+              statusEl.className = 'plan-status completed';
+              statusEl.textContent = 'open-ended';
+              statusEl.style.color = 'var(--text-muted)';
+              statusEl.style.background = 'rgba(139,148,158,0.15)';
+            }
+            const countEl = groupEl.querySelector('.plan-step-count');
+            if (countEl && planChildCount[p.planId]) {
+              countEl.textContent = planChildCount[p.planId] + ' steps';
+            }
+          }
+          delete openPlanContainers[p.planId];
+        }
+      }
+
+      // --- PLAN OPEN ---
+      if (vt === 'DynamicPlanReceived') {
+        const planId = act.value.planIdentifier;
+        const info = planRegistry[planId] || {};
+        const displayName = info.displayName || 'Plan';
+        const parentPlanId = info.parentPlanId || null;
+        const ancestry = planAncestry(planId);
+        const depth = info.depth || 0;
+        const colorCls = planColorClass(planId);
+
+        const group = document.createElement('div');
+        group.className = 'plan-group';
+        group.dataset.planId = planId;
+
+        const header = document.createElement('div');
+        header.className = 'plan-group-header';
+        header.innerHTML = `
+          <span class="plan-icon">&#9654;</span>
+          <span class="step-badge badge-plan">PLAN</span>
+          <span class="plan-pill ${colorCls}" title="${escapeHtml(planId)}">${escapeHtml(displayName)}</span>
+          <span class="plan-id">${escapeHtml(planId.substring(0,8))}...</span>
+          ${ancestry ? '<span class="plan-ancestry">' + escapeHtml(ancestry) + '</span>' : ''}
+          <span class="plan-status running">running</span>
+          <span class="plan-step-count"></span>
+        `;
+
+        const children = document.createElement('div');
+        children.className = 'plan-group-children';
+
+        group.appendChild(header);
+        group.appendChild(children);
+
+        // Smart placement: if this plan has a parentPlanId that's open, nest inside it
+        if (parentPlanId && openPlanContainers[parentPlanId]) {
+          openPlanContainers[parentPlanId].appendChild(group);
+        } else {
+          getCurrentContainer().appendChild(group);
+        }
+
+        // Add the DynamicPlanReceived step itself inside the plan
+        const stepEl = createStepEl(act, cls, title, planId, activityIndex);
+        children.appendChild(stepEl);
+
+        planGroupMap[planId] = group;
+        planChildCount[planId] = 1;
+        openPlanContainers[planId] = children;
+
+        planStack.push({ planId, container: children, displayName });
+
+        header.addEventListener('click', () => {
+          group.classList.toggle('collapsed');
+        });
+        return;
+      }
+
+      // --- PLAN CLOSE ---
+      if (vt === 'DynamicPlanFinished') {
+        const planId = act.value.planId;
+
+        // Place finish step inside the correct plan
+        const container = openPlanContainers[planId] || getCurrentContainer();
+        const stepEl = createStepEl(act, cls, title, planId, activityIndex);
+        container.appendChild(stepEl);
+        planChildCount[planId] = (planChildCount[planId] || 0) + 1;
+
+        // Mark status
+        const groupEl = planGroupMap[planId];
+        if (groupEl) {
+          const statusEl = groupEl.querySelector('.plan-status');
+          if (statusEl) {
+            statusEl.className = act.value.wasCancelled ? 'plan-status cancelled' : 'plan-status completed';
+            statusEl.textContent = act.value.wasCancelled ? 'cancelled' : 'completed';
+          }
+          const countEl = groupEl.querySelector('.plan-step-count');
+          if (countEl && planChildCount[planId]) {
+            countEl.textContent = planChildCount[planId] + ' steps';
+          }
+        }
+
+        // Remove from open containers and stack
+        delete openPlanContainers[planId];
+        for (let i = planStack.length - 1; i >= 0; i--) {
+          if (planStack[i].planId === planId) {
+            planStack.splice(i, 1);
+            break;
+          }
+        }
+        return;
+      }
+
+      // --- PLAN CLOSE via DynamicPlanStepFinished with state=completed ---
+      // Some plans (especially root plans) never get a DynamicPlanFinished event.
+      // They are closed implicitly when their main step finishes with state "completed".
+      if (vt === 'DynamicPlanStepFinished' && act.value && act.value.state === 'completed') {
+        const planId = act.value.planIdentifier;
+        if (planId && openPlanContainers[planId]) {
+          // Place this step inside the plan
+          const container = openPlanContainers[planId];
+          const stepEl = createStepEl(act, cls, title, planId, activityIndex);
+          container.appendChild(stepEl);
+          planChildCount[planId] = (planChildCount[planId] || 0) + 1;
+
+          // Close this plan and any child plans still nested above it on the stack
+          const stackIdx = planStack.findIndex(p => p.planId === planId);
+          if (stackIdx >= 0) {
+            while (planStack.length > stackIdx) {
+              const p = planStack.pop();
+              const groupEl = planGroupMap[p.planId];
+              if (groupEl) {
+                const statusEl = groupEl.querySelector('.plan-status');
+                if (statusEl) {
+                  statusEl.className = 'plan-status completed';
+                  statusEl.textContent = 'completed';
+                }
+                const countEl = groupEl.querySelector('.plan-step-count');
+                if (countEl && planChildCount[p.planId]) {
+                  countEl.textContent = planChildCount[p.planId] + ' steps';
+                }
+              }
+              delete openPlanContainers[p.planId];
+            }
+          }
+          return;
+        }
+      }
+
+      // --- REGULAR ACTIVITY ---
+      const affiliatedPlanId = getActivityPlanAffiliation(act);
+      const container = getBestContainer(affiliatedPlanId);
+      const stepEl = createStepEl(act, cls, title, affiliatedPlanId, activityIndex);
+      container.appendChild(stepEl);
+
+      // Track child count for the plan we placed it in
+      const placedInPlan = affiliatedPlanId && openPlanContainers[affiliatedPlanId]
+        ? affiliatedPlanId
+        : (planStack.length > 0 ? planStack[planStack.length - 1].planId : null);
+      if (placedInPlan) {
+        planChildCount[placedInPlan] = (planChildCount[placedInPlan] || 0) + 1;
+      }
+    });
+
+    // Update step counts for any still-open plans
+    planStack.forEach(p => {
+      const groupEl = planGroupMap[p.planId];
+      if (groupEl) {
+        const countEl = groupEl.querySelector('.plan-step-count');
+        if (countEl && planChildCount[p.planId]) {
+          countEl.textContent = planChildCount[p.planId] + ' steps';
+        }
+      }
+    });
+
+    // === STATS PANEL ===
+    statsPanel.innerHTML = '';
+    statsPanel.classList.remove('hidden');
+
+    // Compute stats
+    const totalDurationMs = (firstTs && lastTs) ? (new Date(lastTs) - new Date(firstTs)) : 0;
+    const totalDurationStr = totalDurationMs > 0 ? (totalDurationMs / 1000).toFixed(1) + 's' : 'N/A';
+    const planCount = Object.keys(planRegistry).length;
+    const completedPlans = activities.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && !a.value.wasCancelled).length;
+    const cancelledPlans = activities.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && a.value.wasCancelled).length;
+    const userTurns = activities.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+    const botResponses = activities.filter(a => a.type === 'message' && a.from && a.from.role === 'bot').length;
+    const toolCalls = activities.filter(a => a.valueType === 'DynamicPlanStepTriggered').length;
+    const searchCalls = activities.filter(a => a.valueType === 'UniversalSearchToolTraceData').length;
+
+    // Find slowest step (skip user messages — user think time shouldn't count)
+    let slowestMs = 0, slowestName = '';
+    activities.forEach((act, i) => {
+      if (act.type === 'message' && act.from && act.from.role === 'user') return;
+      const actTs = getTs(act);
+      if (i === 0 || !actTs) return;
+      const prevTs = getTs(activities[i-1]);
+      if (!prevTs) return;
+      const diffMs = new Date(actTs) - new Date(prevTs);
+      if (diffMs > slowestMs && diffMs < 600000) {
+        slowestMs = diffMs;
+        slowestName = (act.valueType || act.name || act.type || '').substring(0, 20);
+      }
+    });
+    const slowestStr = slowestMs > 0 ? (slowestMs / 1000).toFixed(1) + 's' : 'N/A';
+
+    const statsData = [
+      { value: totalDurationStr, label: 'Total Duration', cls: 'stat-accent' },
+      { value: userTurns, label: 'User Turns', cls: '' },
+      { value: botResponses, label: 'Bot Responses', cls: '' },
+      { value: planCount, label: 'Plans', cls: 'stat-purple' },
+      { value: completedPlans, label: 'Completed', cls: 'stat-green' },
+      { value: cancelledPlans, label: 'Cancelled', cls: cancelledPlans > 0 ? 'stat-red' : '' },
+      { value: toolCalls, label: 'Tool Calls', cls: '' },
+      { value: searchCalls, label: 'Searches', cls: '' },
+      { value: slowestStr, label: 'Slowest Step', cls: slowestMs > 5000 ? 'stat-red' : slowestMs > 2000 ? 'stat-orange' : '' },
+      { value: issues.length, label: 'Issues', cls: issues.length > 0 ? 'stat-red' : 'stat-green' },
+    ];
+    statsData.forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.innerHTML = '<div class="stat-value ' + (s.cls || '') + '">' + escapeHtml(String(s.value)) + '</div><div class="stat-label">' + escapeHtml(s.label) + '</div>';
+      statsPanel.appendChild(card);
+    });
+
+    // === BREADCRUMB TRAIL ===
+    breadcrumbBar.innerHTML = '<span class="bc-label">Location:</span><span class="bc-item" data-target="root">Root</span>';
+    breadcrumbBar.classList.remove('empty');
+
+    // Intersection observer to update breadcrumb as user scrolls
+    const allPlanGroups = timeline.querySelectorAll('.plan-group');
+    if (allPlanGroups.length > 0) {
+      const observerCallback = () => {
+        // Find the plan group(s) currently visible in viewport center
+        const viewMid = window.innerHeight / 2;
+        let deepestVisible = null;
+        let deepestDepth = -1;
+
+        allPlanGroups.forEach(pg => {
+          const rect = pg.getBoundingClientRect();
+          if (rect.top < viewMid && rect.bottom > viewMid && !pg.classList.contains('collapsed')) {
+            // Calculate nesting depth
+            let depth = 0;
+            let parent = pg.parentElement;
+            while (parent && parent !== timeline) {
+              if (parent.classList.contains('plan-group-children')) depth++;
+              parent = parent.parentElement;
+            }
+            if (depth >= deepestDepth) {
+              deepestDepth = depth;
+              deepestVisible = pg;
+            }
+          }
+        });
+
+        // Build breadcrumb chain
+        const chain = [];
+        let cur = deepestVisible;
+        while (cur) {
+          const planId = cur.dataset.planId;
+          if (planId) {
+            const name = planRegistry[planId] ? planRegistry[planId].displayName : planId.substring(0,8);
+            chain.unshift({ planId, name, el: cur });
+          }
+          // Walk up to parent plan-group
+          const parentChildren = cur.parentElement;
+          cur = parentChildren ? parentChildren.closest('.plan-group') : null;
+        }
+
+        // Render breadcrumb
+        breadcrumbBar.innerHTML = '<span class="bc-label">Location:</span>';
+        const rootItem = document.createElement('span');
+        rootItem.className = 'bc-item';
+        rootItem.textContent = 'Root';
+        rootItem.addEventListener('click', () => timeline.scrollIntoView({ behavior: 'smooth' }));
+        breadcrumbBar.appendChild(rootItem);
+
+        chain.forEach(c => {
+          const sep = document.createElement('span');
+          sep.className = 'bc-sep';
+          sep.textContent = ' \u25B8 ';
+          breadcrumbBar.appendChild(sep);
+
+          const item = document.createElement('span');
+          item.className = 'bc-item';
+          item.textContent = c.name;
+          item.title = c.planId;
+          item.addEventListener('click', () => {
+            c.el.classList.remove('collapsed');
+            c.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          breadcrumbBar.appendChild(item);
+        });
+      };
+
+      // Throttled scroll listener
+      let bcRaf = null;
+      const scrollHandler = () => {
+        if (bcRaf) return;
+        bcRaf = requestAnimationFrame(() => {
+          observerCallback();
+          bcRaf = null;
+        });
+      };
+      window.addEventListener('scroll', scrollHandler, { passive: true });
+      scrollCleanup = () => window.removeEventListener('scroll', scrollHandler);
+      // Initial
+      setTimeout(observerCallback, 100);
+    }
+
+    // === CHAT PANE ===
+    chatMessages.innerHTML = '';
+    const chatActivities = activities.filter(a => a.type === 'message' && a.from);
+    // Map activity id to trace step element for cross-linking
+    const actIdToStepEl = {};
+    timeline.querySelectorAll('.step').forEach(el => {
+      if (el._actRef && el._actRef.id) actIdToStepEl[el._actRef.id] = el;
+    });
+
+    if (chatActivities.length > 0) {
+      chatPane.classList.remove('hidden');
+      resizeHandle.classList.remove('hidden');
+
+      chatActivities.forEach(act => {
+        const isUser = act.from.role === 'user';
+        const isBot = act.from.role === 'bot';
+        if (!isUser && !isBot) return;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble ' + (isUser ? 'chat-bubble-user' : 'chat-bubble-bot');
+
+        // Name label
+        const nameEl = document.createElement('div');
+        nameEl.className = 'chat-bubble-name';
+        nameEl.textContent = act.from.name || (isUser ? 'User' : 'Bot');
+        bubble.appendChild(nameEl);
+
+        // Message text
+        const textEl = document.createElement('div');
+        textEl.className = 'chat-bubble-text';
+        const rawText = act.text || '';
+        // Strip citation references like [1] from end, and citeturnXfileY markers
+        const cleanText = rawText.replace(/citeturn\d+file\d+/g, '').replace(/\[\d+\]:\s*https?:\/\/\S+\s*"[^"]*"/g, '').trim();
+        textEl.innerHTML = simpleMarkdown(cleanText);
+        bubble.appendChild(textEl);
+
+        // Citations from entities
+        if (act.entities) {
+          const citations = [];
+          act.entities.forEach(ent => {
+            if (ent.citation && Array.isArray(ent.citation)) {
+              ent.citation.forEach(c => {
+                if (c.appearance && c.appearance.name && c.appearance.url) {
+                  citations.push({ name: c.appearance.name, url: c.appearance.url });
+                }
+              });
+            }
+          });
+          if (citations.length > 0) {
+            const citEl = document.createElement('div');
+            citEl.className = 'chat-bubble-citations';
+            citations.forEach((c, ci) => {
+              const a = document.createElement('a');
+              a.href = c.url;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.textContent = '[' + (ci + 1) + '] ' + c.name.substring(0, 40);
+              a.title = c.name;
+              citEl.appendChild(a);
+            });
+            bubble.appendChild(citEl);
+          }
+        }
+
+        // Timestamp
+        const ts = getTs(act);
+        if (ts) {
+          const tsEl = document.createElement('div');
+          tsEl.className = 'chat-bubble-ts';
+          tsEl.textContent = formatTime(ts);
+          bubble.appendChild(tsEl);
+        }
+
+        // Cross-link: click bubble -> scroll trace to matching step
+        bubble.addEventListener('click', () => {
+          const stepEl = actIdToStepEl[act.id];
+          if (stepEl) {
+            // Ensure parent plan groups are expanded
+            let parent = stepEl.parentElement;
+            while (parent && parent !== timeline) {
+              if (parent.classList.contains('plan-group') && parent.classList.contains('collapsed')) {
+                parent.classList.remove('collapsed');
+              }
+              parent = parent.parentElement;
+            }
+            stepEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            stepEl.style.boxShadow = '0 0 0 2px var(--accent)';
+            setTimeout(() => { stepEl.style.boxShadow = ''; }, 1500);
+          }
+        });
+
+        // Store reference for reverse cross-linking (trace -> chat)
+        bubble._actId = act.id;
+
+        chatMessages.appendChild(bubble);
+      });
+
+      // Reverse cross-link: clicking a message step in trace highlights the chat bubble
+      timeline.querySelectorAll('.step').forEach(el => {
+        if (!el._actRef || el._actRef.type !== 'message') return;
+        const actId = el._actRef.id;
+        el.addEventListener('dblclick', () => {
+          const bubble = chatMessages.querySelector('.chat-bubble');
+          // Find by actId
+          for (const b of chatMessages.children) {
+            if (b._actId === actId) {
+              b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              b.classList.remove('highlight-pulse');
+              void b.offsetWidth; // reflow to restart animation
+              b.classList.add('highlight-pulse');
+              break;
+            }
+          }
+        });
+      });
+    }
+
+    // === RESIZE HANDLE ===
+    (function initResizer() {
+      let startX, startWidth;
+      const onMouseMove = (e) => {
+        const dx = startX - e.clientX;
+        const newWidth = Math.max(250, Math.min(window.innerWidth * 0.7, startWidth + dx));
+        chatPane.style.width = newWidth + 'px';
+      };
+      const onMouseUp = () => {
+        resizeHandle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+      resizeHandle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        startX = e.clientX;
+        startWidth = chatPane.offsetWidth;
+        resizeHandle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    })();
+  }
+
+  // === EXPORT TO HTML ===
+  function exportToHtml() {
+    // Capture current viewer state as a self-contained HTML file
+    const styles = document.querySelector('style').outerHTML;
+    const headerHtml = document.querySelector('header').outerHTML;
+    const viewerEl = document.getElementById('viewer');
+
+    // Clone viewer, remove interactive-only elements (toolbar buttons, search)
+    const clone = viewerEl.cloneNode(true);
+    clone.classList.remove('hidden');
+    // Remove toolbar buttons except file name
+    const cloneToolbar = clone.querySelector('.toolbar');
+    if (cloneToolbar) {
+      const btns = cloneToolbar.querySelectorAll('.toolbar-btn, .search-box');
+      btns.forEach(b => b.remove());
+      const spacers = cloneToolbar.querySelectorAll('.toolbar-spacer');
+      spacers.forEach(s => s.remove());
+    }
+    // Remove copy buttons
+    clone.querySelectorAll('.step-copy').forEach(b => b.remove());
+    // Remove breadcrumb bar
+    const bc = clone.querySelector('.breadcrumb-bar');
+    if (bc) bc.remove();
+    // Expand all steps and plan groups for the report
+    clone.querySelectorAll('.plan-group.collapsed').forEach(pg => pg.classList.remove('collapsed'));
+    // Keep steps collapsed in export (user can toggle via inline script)
+
+    const toggleScript = `<script>
+      document.addEventListener('click', function(e) {
+        var header = e.target.closest('.step-header');
+        if (header) { header.closest('.step').classList.toggle('expanded'); }
+        var pgHeader = e.target.closest('.plan-group-header');
+        if (pgHeader) { pgHeader.closest('.plan-group').classList.toggle('collapsed'); }
+        var rawH4 = e.target.closest('h4[onclick]');
+        if (rawH4 && rawH4.nextElementSibling) { rawH4.nextElementSibling.classList.toggle('hidden'); }
+      });
+    <\/script>`;
+
+    const exportHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trace Report - ${escapeHtml(currentFileName)} - ${new Date().toLocaleDateString()}</title>
+${styles}
+<style>
+  .toolbar { justify-content: flex-start; }
+  .step-header, .plan-group-header { cursor: pointer; }
+  body::after { content: 'Generated by Copilot Studio Trace Viewer on ${new Date().toLocaleString()}'; display: block; text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px; }
+</style>
+</head>
+<body>
+${headerHtml}
+<div class="container">
+${clone.outerHTML}
+</div>
+${toggleScript}
+</body>
+</html>`;
+
+    const blob = new Blob([exportHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'trace-report-' + (currentFileName.replace(/\.[^.]+$/, '')) + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // === COMPARE MODE ===
+  function enterCompareMode(dataA) {
+    const fileNameA = currentFileName;
+
+    // Hide main viewer, show compare view
+    viewer.classList.add('hidden');
+    uploadZone.classList.add('hidden');
+    compareView.classList.remove('hidden');
+    compareView.innerHTML = '';
+
+    // Compare toolbar
+    const cToolbar = document.createElement('div');
+    cToolbar.className = 'toolbar';
+    cToolbar.style.marginBottom = '16px';
+
+    const cTitle = document.createElement('span');
+    cTitle.style.cssText = 'font-size:14px;font-weight:600;color:#fff;';
+    cTitle.textContent = 'Compare Traces';
+    cToolbar.appendChild(cTitle);
+
+    const cSpacer = document.createElement('span');
+    cSpacer.className = 'toolbar-spacer';
+    cToolbar.appendChild(cSpacer);
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'toolbar-btn primary';
+    backBtn.innerHTML = '&#8592; Back to viewer';
+    backBtn.addEventListener('click', () => {
+      compareView.classList.add('hidden');
+      compareView.innerHTML = '';
+      viewer.classList.remove('hidden');
+    });
+    cToolbar.appendChild(backBtn);
+    compareView.appendChild(cToolbar);
+
+    // Upload zone for second file
+    const uploadArea = document.createElement('div');
+    uploadArea.className = 'compare-upload-zone';
+    uploadArea.innerHTML = '<div class="compare-icon">&#128196; &#8596; &#128196;</div><p>Drop or click to upload the second trace file (.json or .zip)</p>';
+    const fileInput2 = document.createElement('input');
+    fileInput2.type = 'file';
+    fileInput2.accept = '.json,.zip';
+    fileInput2.style.display = 'none';
+    uploadArea.appendChild(fileInput2);
+
+    uploadArea.addEventListener('click', () => fileInput2.click());
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length) loadSecondFile(e.dataTransfer.files[0]);
+    });
+    fileInput2.addEventListener('change', e => { if (e.target.files.length) loadSecondFile(e.target.files[0]); });
+
+    compareView.appendChild(uploadArea);
+
+    async function loadSecondFile(file) {
+      const fileNameB = file.name;
+      const ext = file.name.toLowerCase().split('.').pop();
+      let dataB;
+
+      try {
+        if (ext === 'zip') {
+          const arrayBuf = await file.arrayBuffer();
+          const jsonText = await extractJsonFromZip(arrayBuf);
+          dataB = JSON.parse(jsonText);
+        } else {
+          const text = await file.text();
+          dataB = JSON.parse(text);
+        }
+      } catch (err) {
+        alert('Error loading second file: ' + err.message);
+        return;
+      }
+
+      if (!dataB.activities || !dataB.activities.length) {
+        alert('No activities found in second file.');
+        return;
+      }
+
+      uploadArea.remove();
+      renderComparison(dataA, fileNameA, dataB, fileNameB);
+    }
+
+    function renderComparison(dA, fnA, dB, fnB) {
+      const actsA = dA.activities || [];
+      const actsB = dB.activities || [];
+
+      // Compute stats for both
+      function computeStats(acts) {
+        let tsFirst = null, tsLast = null;
+        for (let i = 0; i < acts.length; i++) {
+          const t = acts[i].timestamp || acts[i].localTimestamp;
+          if (t) { tsFirst = new Date(t); break; }
+        }
+        for (let i = acts.length - 1; i >= 0; i--) {
+          const t = acts[i].timestamp || acts[i].localTimestamp;
+          if (t) { tsLast = new Date(t); break; }
+        }
+        const duration = tsFirst && tsLast ? ((tsLast - tsFirst) / 1000).toFixed(1) + 's' : 'N/A';
+        const userTurns = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+        const botMsgs = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'bot').length;
+        const plans = acts.filter(a => a.valueType === 'DynamicPlanReceived').length;
+        const completed = acts.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && !a.value.wasCancelled).length;
+        const cancelled = acts.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && a.value.wasCancelled).length;
+        const toolCalls = acts.filter(a => a.valueType === 'DynamicPlanStepTriggered').length;
+        const searches = acts.filter(a => a.valueType === 'UniversalSearchToolTraceData').length;
+        const errors = acts.filter(a => {
+          if (a.valueType === 'DialogTracingInfo' && a.value && a.value.actions) {
+            return a.value.actions.some(ac => ac.exception);
+          }
+          if (a.valueType === 'DynamicPlanStepFinished' && a.value) {
+            const st = (a.value.state || '').toLowerCase();
+            return st === 'error' || st === 'failed' || st === 'faulted';
+          }
+          return false;
+        }).length;
+        // Unique valueTypes
+        const vts = [...new Set(acts.filter(a => a.valueType).map(a => a.valueType))];
+        return { total: acts.length, duration, userTurns, botMsgs, plans, completed, cancelled, toolCalls, searches, errors, vts };
+      }
+
+      const sA = computeStats(actsA);
+      const sB = computeStats(actsB);
+
+      // Diff summary
+      const summary = document.createElement('div');
+      summary.className = 'compare-summary';
+      const diffRows = [
+        ['Total Activities', sA.total, sB.total],
+        ['Duration', sA.duration, sB.duration],
+        ['User Turns', sA.userTurns, sB.userTurns],
+        ['Bot Responses', sA.botMsgs, sB.botMsgs],
+        ['Plans', sA.plans, sB.plans],
+        ['Completed Plans', sA.completed, sB.completed],
+        ['Cancelled Plans', sA.cancelled, sB.cancelled],
+        ['Tool Calls', sA.toolCalls, sB.toolCalls],
+        ['Searches', sA.searches, sB.searches],
+        ['Errors', sA.errors, sB.errors],
+      ];
+
+      let gridHtml = '<h3>&#128200; Comparison Summary</h3><div class="diff-grid">';
+      gridHtml += '<div class="diff-label"></div><div class="diff-label" style="color:var(--accent)">' + escapeHtml(fnA) + '</div><div class="diff-label" style="color:var(--purple)">' + escapeHtml(fnB) + '</div>';
+      diffRows.forEach(([label, valA, valB]) => {
+        const changed = String(valA) !== String(valB);
+        gridHtml += '<div class="diff-label">' + escapeHtml(label) + '</div>';
+        gridHtml += '<div class="diff-val' + (changed ? ' diff-changed' : '') + '">' + escapeHtml(String(valA)) + '</div>';
+        gridHtml += '<div class="diff-val' + (changed ? ' diff-changed' : '') + '">' + escapeHtml(String(valB)) + '</div>';
+      });
+      gridHtml += '</div>';
+      summary.innerHTML = gridHtml;
+      compareView.appendChild(summary);
+
+      // Side-by-side panes
+      const container = document.createElement('div');
+      container.className = 'compare-container';
+
+      function buildPane(acts, fileName, labelCls) {
+        const pane = document.createElement('div');
+        pane.className = 'compare-pane';
+
+        const header = document.createElement('div');
+        header.className = 'pane-header';
+        header.innerHTML = '<span class="pane-label ' + labelCls + '">' + (labelCls === 'pane-label-a' ? 'A' : 'B') + '</span>' +
+          '<span class="pane-filename">' + escapeHtml(fileName) + '</span>' +
+          '<span style="font-size:11px;color:var(--text-muted)">' + acts.length + ' activities</span>';
+        pane.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'pane-body';
+
+        const tl = document.createElement('div');
+        tl.className = 'timeline';
+
+        acts.forEach(act => {
+          const cls = classifyActivity(act);
+          const title = buildTitle(act, cls);
+          const ts = getTs(act);
+
+          const step = document.createElement('div');
+          step.className = 'step type-' + cls.cat;
+          step.innerHTML = `
+            <div class="dot"></div>
+            <div class="step-card">
+              <div class="step-header">
+                <span class="step-badge ${cls.badgeCls}">${cls.badge}</span>
+                <span class="step-title">${escapeHtml(title)}</span>
+                <span class="step-time">${formatTime(ts)}</span>
+                <span class="step-chevron">&#9654;</span>
+              </div>
+              <div class="step-detail">${buildDetail(act, cls)}</div>
+            </div>`;
+          step.querySelector('.step-header').addEventListener('click', () => step.classList.toggle('expanded'));
+          tl.appendChild(step);
+        });
+
+        body.appendChild(tl);
+        pane.appendChild(body);
+        return pane;
+      }
+
+      container.appendChild(buildPane(actsA, fnA, 'pane-label-a'));
+      container.appendChild(buildPane(actsB, fnB, 'pane-label-b'));
+      compareView.appendChild(container);
+    }
+  }
+})();
+</script>
+</body>
+</html>
