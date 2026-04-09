@@ -917,11 +917,12 @@
 </header>
 
 <div class="container">
-  <div id="upload-zone">
+  <div id="upload-zone" role="button" tabindex="0" aria-label="Upload a dialog.json or .zip trace file. Drop file here or press Enter to browse.">
     <div class="icon">&#128270;</div>
     <div class="big">Drop a dialog.json or .zip file here, or click to upload</div>
     <p>Exported conversation trace from Copilot Studio</p>
-    <input type="file" id="file-input" accept=".json,.zip">
+    <label for="file-input" class="hidden">Upload trace file</label>
+    <input type="file" id="file-input" accept=".json,.zip" aria-label="Upload trace file">
   </div>
 
   <div class="app-layout" id="app-layout">
@@ -971,6 +972,7 @@
   let scrollCleanup = null; // to remove scroll listener on reset
 
   uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
   uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
   uploadZone.addEventListener('drop', e => {
@@ -1151,6 +1153,8 @@
     html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
     html = html.replace(/^  - (.+)$/gm, '<li style="margin-left:16px">$1</li>');
     html = html.replace(/^    - (.+)$/gm, '<li style="margin-left:32px">$1</li>');
+    // Wrap consecutive <li> elements in <ul>
+    html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/g, '<ul>$1</ul>');
     // Paragraphs (consecutive lines without tags)
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
@@ -1672,15 +1676,26 @@
     }
 
     function highlightTextInEl(el, query) {
-      const text = el.textContent;
-      const lowerText = text.toLowerCase();
-      const lq = query.toLowerCase();
-      const idx = lowerText.indexOf(lq);
-      if (idx === -1) return;
-      const before = text.substring(0, idx);
-      const match = text.substring(idx, idx + query.length);
-      const after = text.substring(idx + query.length);
-      el.innerHTML = escapeHtml(before) + '<span class="search-highlight">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+      // Only operate on the first text node to avoid destroying child elements (pills, badges)
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      let node;
+      while (node = walker.nextNode()) {
+        const text = node.nodeValue;
+        const idx = text.toLowerCase().indexOf(query.toLowerCase());
+        if (idx === -1) continue;
+        const before = text.substring(0, idx);
+        const match = text.substring(idx, idx + query.length);
+        const after = text.substring(idx + query.length);
+        const span = document.createElement('span');
+        span.className = 'search-highlight';
+        span.textContent = match;
+        const frag = document.createDocumentFragment();
+        if (before) frag.appendChild(document.createTextNode(before));
+        frag.appendChild(span);
+        if (after) frag.appendChild(document.createTextNode(after));
+        node.parentNode.replaceChild(frag, node);
+        return; // highlight first occurrence only
+      }
     }
 
     // Extract conversation info
@@ -1702,7 +1717,7 @@
     convInfo.innerHTML = '';
     [
       ['Bot Name', botName],
-      ['Conversation ID', convId ? convId.substring(0,18) + '...' : ''],
+      ['Conversation ID', convId || ''],
       ['Activities', activities.length],
       ['Start', formatTime(firstTs)],
       ['End', formatTime(lastTs)],
@@ -1986,7 +2001,7 @@
       step.innerHTML = `
         <div class="dot"></div>
         <div class="step-card">
-          <div class="step-header">
+          <div class="step-header" role="button" tabindex="0" aria-expanded="false">
             <span class="step-badge ${cls.badgeCls}">${cls.badge}</span>
             ${pillHtml}
             <span class="step-title">${escapeHtml(title)}</span>
@@ -2016,21 +2031,18 @@
           copyBtn.innerHTML = '&#10003;';
           setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = '&#128203;'; }, 1500);
         }).catch(() => {
-          // Fallback: copy title + raw JSON
-          const fallback = title + '\n\n' + JSON.stringify(act, null, 2);
-          const ta = document.createElement('textarea');
-          ta.value = fallback;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          copyBtn.classList.add('copied');
-          copyBtn.innerHTML = '&#10003;';
-          setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = '&#128203;'; }, 1500);
+          // Clipboard API failed — no fallback on modern browsers
+          console.warn('Clipboard write failed');
         });
       });
-      step.querySelector('.step-header').addEventListener('click', () => {
+      const stepHeader = step.querySelector('.step-header');
+      function toggleStep() {
         step.classList.toggle('expanded');
+        stepHeader.setAttribute('aria-expanded', step.classList.contains('expanded'));
+      }
+      stepHeader.addEventListener('click', toggleStep);
+      stepHeader.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStep(); }
       });
       return step;
     }
@@ -2132,8 +2144,16 @@
 
         planStack.push({ planId, container: children, displayName });
 
-        header.addEventListener('click', () => {
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', 'true');
+        function togglePlanGroup() {
           group.classList.toggle('collapsed');
+          header.setAttribute('aria-expanded', !group.classList.contains('collapsed'));
+        }
+        header.addEventListener('click', togglePlanGroup);
+        header.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePlanGroup(); }
         });
         return;
       }
@@ -2423,9 +2443,9 @@
             citEl.className = 'chat-bubble-citations';
             citations.forEach((c, ci) => {
               const a = document.createElement('a');
-              a.href = c.url;
+              a.href = /^https?:\/\//i.test(c.url) ? c.url : '#';
               a.target = '_blank';
-              a.rel = 'noopener';
+              a.rel = 'noopener noreferrer';
               a.textContent = '[' + (ci + 1) + '] ' + c.name.substring(0, 40);
               a.title = c.name;
               citEl.appendChild(a);
