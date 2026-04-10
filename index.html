@@ -2802,7 +2802,7 @@
     // === KEYBOARD NAVIGATION ===
     (function initKeyboardNav() {
       function getAllVisibleSteps() {
-        return Array.from(timeline.querySelectorAll('.step:not(.hidden):not(.search-hidden)'));
+        return Array.from(timeline.querySelectorAll('.step:not(.hidden):not(.search-hidden)')).filter(s => !s.closest('.plan-group.collapsed'));
       }
       function getFocusedStep() {
         const focused = document.activeElement;
