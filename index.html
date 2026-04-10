@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Copilot Studio Conversation Trace Viewer</title>
 <style>
-  :root {
+  :root, [data-theme="dark"] {
     --bg: #0d1117;
     --surface: #161b22;
     --surface2: #21262d;
@@ -19,6 +19,38 @@
     --purple: #bc8cff;
     --cyan: #39d2c0;
     --pink: #f778ba;
+  }
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --surface2: #eaeef2;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --text-muted: #656d76;
+    --accent: #0969da;
+    --green: #1a7f37;
+    --orange: #9a6700;
+    --red: #cf222e;
+    --purple: #8250df;
+    --cyan: #1b7c83;
+    --pink: #bf3989;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #ffffff;
+      --surface: #f6f8fa;
+      --surface2: #eaeef2;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --text-muted: #656d76;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --orange: #9a6700;
+      --red: #cf222e;
+      --purple: #8250df;
+      --cyan: #1b7c83;
+      --pink: #bf3989;
+    }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -897,6 +929,107 @@
   .compare-upload-zone p { color: var(--text-muted); font-size: 13px; }
   .compare-upload-zone .compare-icon { font-size: 28px; margin-bottom: 6px; }
 
+  /* Theme toggle button */
+  .theme-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+  .theme-toggle .theme-icon { font-size: 16px; }
+
+  /* Sticky plan headers */
+  .plan-group-header {
+    position: sticky;
+    top: 36px;
+    z-index: 5;
+  }
+  .plan-group .plan-group .plan-group-header { top: 72px; }
+  .plan-group .plan-group .plan-group .plan-group-header { top: 108px; }
+
+  /* Time gap separator */
+  .time-gap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    margin: 2px 0;
+  }
+  .time-gap-line {
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(to right, var(--orange) 0, var(--orange) 4px, transparent 4px, transparent 8px);
+  }
+  .time-gap-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--orange);
+    background: var(--surface);
+    padding: 1px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(210,153,34,0.3);
+    white-space: nowrap;
+  }
+
+  /* Timeline minimap */
+  .minimap {
+    position: fixed;
+    right: 4px;
+    top: 60px;
+    bottom: 20px;
+    width: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    z-index: 20;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s, width 0.2s;
+  }
+  .minimap:hover { opacity: 1; width: 16px; }
+  .minimap-block {
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    min-height: 2px;
+    border-radius: 1px;
+  }
+  .minimap-viewport {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: rgba(88,166,255,0.25);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+  .minimap.hidden { display: none; }
+
+  /* Copy summary button */
+  .step-summary-copy {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .step-summary-copy:hover { color: var(--accent); background: var(--surface2); }
+  .step-summary-copy.copied { color: var(--green); }
+
   @media (max-width: 768px) {
     .container { padding: 12px; }
     header { padding: 12px 16px; }
@@ -905,6 +1038,25 @@
     .app-layout { flex-direction: column; }
     .app-layout .chat-pane { width: 100% !important; max-width: 100%; border-left: none; border-top: 1px solid var(--border); min-height: 300px; }
     .app-layout .resize-handle { display: none; }
+    .minimap { display: none; }
+    .plan-group-header { position: relative; top: auto; }
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    header { background: #fff; border-bottom: 2px solid #000; }
+    header h1 { color: #000; }
+    .theme-toggle, .toolbar-btn, .search-box, .resize-handle, .chat-pane, .minimap, #upload-zone { display: none !important; }
+    .app-layout { display: block; }
+    .step-card { border: 1px solid #ccc; break-inside: avoid; }
+    .plan-group-header { position: relative; top: auto; border: 1px solid #ccc; break-inside: avoid; }
+    .plan-group-children { border-left-color: #999; }
+    .step.expanded .step-detail { display: block; }
+    .plan-group.collapsed .plan-group-children { display: block; }
+    .breadcrumb-bar { display: none; }
+    .filter-bar { display: none; }
+    .step-copy, .step-summary-copy { display: none; }
+    .error-banner { border: 2px solid #cf222e; }
+    :root { --bg:#fff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de; --text:#1f2328; --text-muted:#656d76; --accent:#0969da; --green:#1a7f37; --orange:#9a6700; --red:#cf222e; --purple:#8250df; --cyan:#1b7c83; --pink:#bf3989; }
   }
 </style>
 </head>
@@ -914,7 +1066,11 @@
     <h1>Copilot Studio Trace Viewer</h1>
     <div class="subtitle">Upload a dialog.json to explore conversation steps</div>
   </div>
+  <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark theme">
+    <span class="theme-icon" id="theme-icon">&#127769;</span>
+  </button>
 </header>
+<div class="minimap hidden" id="minimap"><div class="minimap-viewport" id="minimap-viewport"></div></div>
 
 <div class="container">
   <div id="upload-zone" role="button" tabindex="0" aria-label="Upload a dialog.json or .zip trace file. Drop file here or press Enter to browse.">
@@ -967,9 +1123,42 @@
   const chatPane = document.getElementById('chat-pane');
   const chatMessages = document.getElementById('chat-messages');
   const resizeHandle = document.getElementById('resize-handle');
+  const minimapEl = document.getElementById('minimap');
+  const minimapViewport = document.getElementById('minimap-viewport');
   let currentFileName = '';
   let lastLoadedData = null; // keep reference for export
   let scrollCleanup = null; // to remove scroll listener on reset
+  let minimapCleanup = null; // to remove minimap listeners on reset
+
+  // === THEME TOGGLE ===
+  (function initTheme() {
+    const toggle = document.getElementById('theme-toggle');
+    const icon = document.getElementById('theme-icon');
+    const saved = localStorage.getItem('trace-viewer-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+    function updateIcon() {
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'light') { icon.innerHTML = '&#9728;&#65039;'; }
+      else if (current === 'dark') { icon.innerHTML = '&#127769;'; }
+      else {
+        // Auto — check system preference
+        icon.innerHTML = window.matchMedia('(prefers-color-scheme: light)').matches ? '&#9728;&#65039;' : '&#127769;';
+      }
+    }
+    updateIcon();
+    toggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      let next;
+      if (current === 'dark') next = 'light';
+      else if (current === 'light') next = 'dark';
+      else next = window.matchMedia('(prefers-color-scheme: light)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('trace-viewer-theme', next);
+      updateIcon();
+    });
+  })();
 
   uploadZone.addEventListener('click', () => fileInput.click());
   uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
@@ -1542,6 +1731,9 @@
     currentFileName = '';
     lastLoadedData = null;
     if (scrollCleanup) { scrollCleanup(); scrollCleanup = null; }
+    if (minimapCleanup) { minimapCleanup(); minimapCleanup = null; }
+    minimapEl.classList.add('hidden');
+    minimapEl.querySelectorAll('.minimap-block').forEach(b => b.remove());
   }
 
   function processDialog(data) {
@@ -2015,7 +2207,8 @@
             <span class="step-title">${escapeHtml(title)}</span>
             ${durationHtml}
             <span class="step-time">${formatTime(ts)}</span>
-            <button class="step-copy" title="Copy to clipboard">&#128203;</button>
+            <button class="step-copy" title="Copy JSON to clipboard">&#128203;</button>
+            <button class="step-summary-copy" title="Copy as summary">&#128221;</button>
             <span class="step-chevron">&#9654;</span>
           </div>
           <div class="step-detail">${buildDetail(act, cls)}</div>
@@ -2043,6 +2236,28 @@
           console.warn('Clipboard write failed');
         });
       });
+      // Copy summary button (human-readable)
+      step.querySelector('.step-summary-copy').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const btn = step.querySelector('.step-summary-copy');
+        const lines = [];
+        lines.push('[' + cls.badge + '] ' + title);
+        if (ts) lines.push('Time: ' + formatTime(ts));
+        if (act.from) lines.push('From: ' + (act.from.name || '') + ' (' + (act.from.role || '') + ')');
+        if (act.text && (cls.cat === 'user-message' || cls.cat === 'bot-message')) lines.push('Text: ' + act.text.substring(0, 500));
+        const v = act.value || {};
+        if (v.state) lines.push('State: ' + v.state);
+        if (v.taskDialogId) lines.push('Task: ' + v.taskDialogId);
+        if (v.thought) lines.push('Thought: ' + v.thought);
+        if (v.executionTime) lines.push('Execution Time: ' + v.executionTime);
+        if (v.error) lines.push('Error: [' + (v.error.userErrorCode || '') + '] ' + (v.error.message || ''));
+        if (v.planIdentifier) lines.push('Plan: ' + v.planIdentifier);
+        navigator.clipboard.writeText(lines.join('\n')).then(() => {
+          btn.classList.add('copied');
+          btn.textContent = '\u2713';
+          setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '&#128221;'; }, 1500);
+        }).catch(() => {});
+      });
       const stepHeader = step.querySelector('.step-header');
       function toggleStep() {
         step.classList.toggle('expanded');
@@ -2055,10 +2270,28 @@
       return step;
     }
 
+    // Helper: create a time gap separator element
+    function createTimeGap(diffMs) {
+      const gap = document.createElement('div');
+      gap.className = 'time-gap';
+      const diffSec = diffMs / 1000;
+      let label;
+      if (diffSec < 60) label = diffSec.toFixed(1) + 's gap';
+      else label = (diffSec / 60).toFixed(1) + 'm gap';
+      gap.innerHTML = '<div class="time-gap-line"></div><span class="time-gap-label">\u23F1 ' + label + '</span><div class="time-gap-line"></div>';
+      return gap;
+    }
+
     // Stack-based plan grouping
     const planStack = [];
     const planGroupMap = {};  // planId -> plan-group element
     const planChildCount = {};
+    const planFailedCount = {}; // track failed steps per plan
+    function planCountText(planId) {
+      const total = planChildCount[planId] || 0;
+      const failed = planFailedCount[planId] || 0;
+      return total + ' steps' + (failed > 0 ? ', ' + failed + ' failed' : '');
+    }
     // Also track open plan containers by planId for smart placement
     const openPlanContainers = {}; // planId -> children div
 
@@ -2080,6 +2313,18 @@
     steps.forEach(({ act, cls, title, index: activityIndex }, stepIdx) => {
       const vt = act.valueType || '';
 
+      // Insert time gap separator if >5s since previous activity
+      if (activityIndex > 0) {
+        const actTs = getTs(act);
+        const prevTs = getTs(activities[activityIndex - 1]);
+        if (actTs && prevTs) {
+          const diffMs = new Date(actTs) - new Date(prevTs);
+          if (diffMs > 5000 && diffMs < 600000) {
+            getCurrentContainer().appendChild(createTimeGap(diffMs));
+          }
+        }
+      }
+
       // --- TURN SEPARATOR: User messages break out of any open plans ---
       if (cls.cat === 'user-message' && planStack.length > 0) {
         // Force-close all open plan groups (mark as "open-ended")
@@ -2096,7 +2341,7 @@
             }
             const countEl = groupEl.querySelector('.plan-step-count');
             if (countEl && planChildCount[p.planId]) {
-              countEl.textContent = planChildCount[p.planId] + ' steps';
+              countEl.textContent = planCountText(p.planId);
             }
           }
           delete openPlanContainers[p.planId];
@@ -2187,7 +2432,7 @@
           }
           const countEl = groupEl.querySelector('.plan-step-count');
           if (countEl && planChildCount[planId]) {
-            countEl.textContent = planChildCount[planId] + ' steps';
+            countEl.textContent = planCountText(planId);
           }
         }
 
@@ -2228,7 +2473,7 @@
                 }
                 const countEl = groupEl.querySelector('.plan-step-count');
                 if (countEl && planChildCount[p.planId]) {
-                  countEl.textContent = planChildCount[p.planId] + ' steps';
+                  countEl.textContent = planCountText(p.planId);
                 }
               }
               delete openPlanContainers[p.planId];
@@ -2250,6 +2495,13 @@
         : (planStack.length > 0 ? planStack[planStack.length - 1].planId : null);
       if (placedInPlan) {
         planChildCount[placedInPlan] = (planChildCount[placedInPlan] || 0) + 1;
+        // Track failed steps
+        if (vt === 'DynamicPlanStepFinished' && act.value) {
+          const state = (act.value.state || '').toLowerCase();
+          if (state === 'failed' || state === 'error' || state === 'faulted') {
+            planFailedCount[placedInPlan] = (planFailedCount[placedInPlan] || 0) + 1;
+          }
+        }
       }
     });
 
@@ -2259,7 +2511,7 @@
       if (groupEl) {
         const countEl = groupEl.querySelector('.plan-step-count');
         if (countEl && planChildCount[p.planId]) {
-          countEl.textContent = planChildCount[p.planId] + ' steps';
+          countEl.textContent = planCountText(p.planId);
         }
       }
     });
@@ -2542,6 +2794,138 @@
         document.addEventListener('mouseup', onMouseUp);
       });
     })();
+
+    // === AUTO-EXPAND ERRORS / COLLAPSE ALL ===
+    if (issues.length > 0) {
+      // Auto-expand steps that have issues
+      issues.forEach(issue => {
+        const allSteps = timeline.querySelectorAll('.step');
+        for (const s of allSteps) {
+          if (s._actRef === issue.activityRef) {
+            // Expand parent plan groups
+            let parent = s.parentElement;
+            while (parent && parent !== timeline) {
+              if (parent.classList.contains('plan-group')) {
+                parent.classList.remove('collapsed');
+              }
+              parent = parent.parentElement;
+            }
+            s.classList.add('expanded');
+            break;
+          }
+        }
+      });
+    } else {
+      // No issues: collapse all plan groups
+      timeline.querySelectorAll('.plan-group').forEach(pg => pg.classList.add('collapsed'));
+    }
+
+    // === KEYBOARD NAVIGATION ===
+    (function initKeyboardNav() {
+      function getAllVisibleSteps() {
+        return Array.from(timeline.querySelectorAll('.step:not(.hidden):not(.search-hidden)'));
+      }
+      function getFocusedStep() {
+        const focused = document.activeElement;
+        if (focused && focused.classList.contains('step-header')) return focused.closest('.step');
+        return null;
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (viewer.classList.contains('hidden')) return;
+
+        const steps = getAllVisibleSteps();
+        if (!steps.length) return;
+
+        const current = getFocusedStep();
+        let currentIdx = current ? steps.indexOf(current) : -1;
+
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+          e.preventDefault();
+          const nextIdx = Math.min(currentIdx + 1, steps.length - 1);
+          const header = steps[nextIdx].querySelector('.step-header');
+          if (header) { header.focus(); steps[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+          e.preventDefault();
+          const prevIdx = Math.max(currentIdx - 1, 0);
+          const header = steps[prevIdx].querySelector('.step-header');
+          if (header) { header.focus(); steps[prevIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        } else if (e.key === 'Enter' && current) {
+          e.preventDefault();
+          current.classList.toggle('expanded');
+        } else if (e.key === 'Escape' && current) {
+          e.preventDefault();
+          if (current.classList.contains('expanded')) {
+            current.classList.remove('expanded');
+          } else {
+            // Move focus to parent plan group header
+            const planChildren = current.closest('.plan-group-children');
+            if (planChildren) {
+              const planGroup = planChildren.closest('.plan-group');
+              if (planGroup) {
+                const pgHeader = planGroup.querySelector('.plan-group-header');
+                if (pgHeader) { pgHeader.focus(); planGroup.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+              }
+            }
+          }
+        }
+      });
+    })();
+
+    // === MINIMAP ===
+    (function initMinimap() {
+      const allSteps = timeline.querySelectorAll('.step');
+      if (allSteps.length < 5) { minimapEl.classList.add('hidden'); return; }
+
+      minimapEl.classList.remove('hidden');
+      // Clear old blocks
+      minimapEl.querySelectorAll('.minimap-block').forEach(b => b.remove());
+
+      const catColors = {
+        'user-message': 'var(--accent)', 'bot-message': 'var(--green)', 'plan': 'var(--purple)',
+        'thought': 'var(--orange)', 'tool': 'var(--cyan)', 'search': 'var(--pink)',
+        'info': 'var(--text-muted)', 'typing': 'var(--surface2)',
+      };
+
+      const totalSteps = allSteps.length;
+      allSteps.forEach((s, i) => {
+        const block = document.createElement('div');
+        block.className = 'minimap-block';
+        const pct = (i / totalSteps) * 100;
+        const heightPct = Math.max(0.5, 100 / totalSteps);
+        block.style.top = pct + '%';
+        block.style.height = heightPct + '%';
+        block.style.background = catColors[s.dataset.cat] || 'var(--text-muted)';
+        minimapEl.appendChild(block);
+      });
+
+      function updateViewport() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        const minimapHeight = minimapEl.clientHeight;
+        const vpTop = (scrollTop / docHeight) * minimapHeight;
+        const vpHeight = (viewportHeight / docHeight) * minimapHeight;
+        minimapViewport.style.top = vpTop + 'px';
+        minimapViewport.style.height = Math.max(10, vpHeight) + 'px';
+      }
+
+      function onMinimapClick(e) {
+        const rect = minimapEl.getBoundingClientRect();
+        const pct = (e.clientY - rect.top) / rect.height;
+        const scrollTarget = pct * document.documentElement.scrollHeight;
+        window.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+      }
+
+      minimapEl.addEventListener('click', onMinimapClick);
+      window.addEventListener('scroll', updateViewport, { passive: true });
+      updateViewport();
+
+      minimapCleanup = () => {
+        window.removeEventListener('scroll', updateViewport);
+        minimapEl.removeEventListener('click', onMinimapClick);
+      };
+    })();
   }
 
   // === EXPORT TO HTML ===
@@ -2564,6 +2948,7 @@
     }
     // Remove copy buttons
     clone.querySelectorAll('.step-copy').forEach(b => b.remove());
+    clone.querySelectorAll('.step-summary-copy').forEach(b => b.remove());
     // Remove breadcrumb bar
     const bc = clone.querySelector('.breadcrumb-bar');
     if (bc) bc.remove();
@@ -2621,6 +3006,8 @@ ${toggleScript}
 
     // Clean up scroll listener before switching views
     if (scrollCleanup) { scrollCleanup(); scrollCleanup = null; }
+    if (minimapCleanup) { minimapCleanup(); minimapCleanup = null; }
+    minimapEl.classList.add('hidden');
 
     // Hide main viewer, show compare view
     viewer.classList.add('hidden');
