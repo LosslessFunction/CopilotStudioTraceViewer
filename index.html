@@ -1533,7 +1533,7 @@
         html += '<div class="kv-row"><span class="kv-key">Message</span><span class="kv-val" style="color:var(--red);">' + escapeHtml(v.error.message || '') + '</span></div>';
         html += '</div></div>';
       }
-      if (v.observation) {
+      if (v.observation && Object.keys(v.observation).filter(k => k !== 'downloaded_files').length > 0) {
         html += '<div class="detail-section"><h4>Observation / Output</h4><div class="detail-content">';
         if (v.observation.search_result && v.observation.search_result.search_results) {
           const results = v.observation.search_result.search_results;
