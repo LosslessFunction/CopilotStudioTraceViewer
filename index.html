@@ -3437,9 +3437,12 @@
       const planInfo = {};
       planReceiveds.forEach(a => { planInfo[a.value.planIdentifier] = a.value; });
 
-      // Detect parent agent name
+      // Detect parent agent name — prefer bot display name from message 'from.name'
       let parentAgentSchema = '';
+      let parentAgentDisplayName = '';
       connInits.forEach(a => { if (a.value.parentBotSchemaName) parentAgentSchema = a.value.parentBotSchemaName; });
+      const botMsg = activities.find(a => a.from && a.from.role === 'bot' && a.from.name);
+      if (botMsg) parentAgentDisplayName = botMsg.from.name;
 
       // Build a sequence of flow events in activity order
       const flowSeq = []; // { type, data, actIdx }
@@ -3461,7 +3464,7 @@
       if (flowSeq.length === 0) return;
 
       // Track connected agent context
-      let currentAgent = parentAgentSchema ? parentAgentSchema.split('_').pop() : 'Parent Agent';
+      let currentAgent = parentAgentDisplayName || (parentAgentSchema ? parentAgentSchema.split('_').pop() : 'Parent Agent');
       const connAgentStepIds = new Set(); // stepIds that are connected agent invocations
       connInits.forEach(a => { if (a.value.planStepId) connAgentStepIds.add(a.value.planStepId); });
 
@@ -3497,7 +3500,7 @@
         } else if (ev.type === 'agent-done') {
           const parentSchema = ev.data.parentBotSchemaName || parentAgentSchema;
           const parentId = 'agent:' + parentSchema;
-          const parentLabel = parentSchema ? parentSchema.split('_').pop() : 'Parent Agent';
+          const parentLabel = parentAgentDisplayName || (parentSchema ? parentSchema.split('_').pop() : 'Parent Agent');
           addNode(parentId, parentLabel, 'agent-parent');
           if (prevNodeId) flowEdges.push({ from: prevNodeId, to: parentId, label: 'return', edgeType: 'return' });
           prevNodeId = parentId;
