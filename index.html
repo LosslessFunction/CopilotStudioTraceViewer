@@ -1017,6 +1017,137 @@
   .step-summary-copy:hover { color: var(--accent); background: var(--surface2); }
   .step-summary-copy.copied { color: var(--green); }
 
+  /* === Regex search toggle === */
+  .search-box .regex-toggle {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-family: monospace; font-size: 11px; padding: 2px 6px; border-radius: 4px;
+    cursor: pointer; line-height: 1; margin-left: 4px;
+  }
+  .search-box .regex-toggle.active { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.1); }
+
+  /* === Collapsible JSON viewer === */
+  .json-tree { font-family: monospace; font-size: 11px; line-height: 1.5; }
+  .json-tree .jt-key { color: var(--accent); }
+  .json-tree .jt-str { color: var(--green); }
+  .json-tree .jt-num { color: var(--orange); }
+  .json-tree .jt-bool { color: var(--purple); }
+  .json-tree .jt-null { color: var(--text-muted); font-style: italic; }
+  .json-tree .jt-toggle { cursor: pointer; user-select: none; color: var(--text-muted); }
+  .json-tree .jt-toggle:hover { color: var(--accent); }
+  .json-tree .jt-collapsed > .jt-children { display: none; }
+  .json-tree .jt-collapsed > .jt-toggle::before { content: '\25B6 '; }
+  .json-tree .jt-expanded > .jt-toggle::before { content: '\25BC '; }
+  .json-tree .jt-children { margin-left: 16px; }
+  .json-tree .jt-ellipsis { color: var(--text-muted); cursor: pointer; }
+
+  /* === Waterfall / Gantt chart === */
+  .waterfall-panel { 
+    margin: 16px 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .waterfall-panel.hidden { display: none; }
+  .waterfall-header {
+    padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  }
+  .waterfall-header h3 { font-size: 14px; color: var(--heading); }
+  .waterfall-body { padding: 12px; overflow-x: auto; }
+  .waterfall-chart { position: relative; min-height: 40px; }
+  .wf-row { display: flex; align-items: center; height: 24px; margin-bottom: 2px; }
+  .wf-label { width: 180px; min-width: 180px; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; text-align: right; }
+  .wf-track { flex: 1; position: relative; height: 18px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .wf-bar { position: absolute; height: 100%; border-radius: 3px; min-width: 2px; cursor: pointer; opacity: 0.85; transition: opacity 0.15s; }
+  .wf-bar:hover { opacity: 1; }
+  .wf-bar-label { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #fff; white-space: nowrap; pointer-events: none; }
+  .wf-time-axis { display: flex; justify-content: space-between; padding-left: 180px; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+  .wf-legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 16px; font-size: 11px; }
+  .wf-legend-item { display: flex; align-items: center; gap: 4px; }
+  .wf-legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* === Knowledge source analysis === */
+  .knowledge-panel { 
+    margin: 16px 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .knowledge-panel.hidden { display: none; }
+  .knowledge-header {
+    padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  }
+  .knowledge-header h3 { font-size: 14px; color: var(--heading); }
+  .knowledge-body { padding: 12px; }
+  .knowledge-body.collapsed-body { display: none; }
+  .ks-section { margin-bottom: 12px; }
+  .ks-section h4 { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ks-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--surface2); border-radius: 4px; margin-bottom: 4px; font-size: 12px; }
+  .ks-item .ks-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ks-item .ks-count { background: var(--accent); color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+  .ks-item.ks-empty { color: var(--red); background: rgba(248,81,73,0.08); }
+  .ks-query { font-size: 11px; color: var(--text); background: var(--surface2); padding: 4px 8px; border-radius: 4px; margin-bottom: 3px; border-left: 3px solid var(--accent); }
+
+  /* === Conversation flow diagram === */
+  .flow-panel { 
+    margin: 16px 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .flow-panel.hidden { display: none; }
+  .flow-header { 
+    padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  }
+  .flow-header h3 { font-size: 14px; color: var(--heading); }
+  .flow-body { padding: 12px; overflow-x: auto; }
+  .flow-body.collapsed-body { display: none; }
+  .flow-svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+
+  /* === Dependency lines === */
+  .dep-lines-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .dep-line { fill: none; stroke-width: 1.5; opacity: 0.5; }
+  .dep-line.dep-complete { stroke: var(--green); }
+  .dep-line.dep-failed { stroke: var(--red); stroke-dasharray: 4,3; }
+  .dep-line.dep-orphan { stroke: var(--orange); stroke-dasharray: 6,3; }
+  .dep-marker { fill: var(--green); }
+  .dep-marker.dep-failed { fill: var(--red); }
+  .dep-marker.dep-orphan { fill: var(--orange); }
+  .dep-legend { display: flex; gap: 12px; padding: 6px 0; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+  .dep-legend-item { display: flex; align-items: center; gap: 4px; }
+
+  /* === Batch analysis === */
+  .batch-dashboard { margin: 0 auto; max-width: 1200px; }
+  .batch-dashboard.hidden { display: none; }
+  .batch-header { margin-bottom: 16px; }
+  .batch-header h2 { font-size: 18px; color: var(--heading); margin-bottom: 8px; }
+  .batch-agg { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .batch-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 140px; }
+  .batch-stat .bs-val { font-size: 22px; font-weight: 700; color: var(--heading); }
+  .batch-stat .bs-label { font-size: 11px; color: var(--text-muted); }
+  .batch-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--surface); border-radius: 8px; overflow: hidden; }
+  .batch-table th { background: var(--surface2); padding: 8px 12px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .batch-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .batch-table tr:hover td { background: var(--surface2); }
+  .batch-table tr { cursor: pointer; }
+  .batch-table .bt-err { color: var(--red); font-weight: 600; }
+  .batch-table .bt-ok { color: var(--green); }
+  .batch-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .batch-stat-val { font-size: 22px; font-weight: 700; color: var(--heading); }
+  .batch-stat-val.bt-err { color: var(--red); }
+  .batch-stat-lbl { font-size: 11px; color: var(--text-muted); }
+  .batch-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding: 16px 0; }
+  .batch-header h2 { margin: 0; font-size: 18px; color: var(--heading); }
+  .batch-header span { font-size: 12px; color: var(--text-muted); }
+  .batch-back { margin-left: auto; }
+  .bt-err-row td { background: color-mix(in srgb, var(--red) 8%, transparent); }
+  .batch-errors { margin-top: 16px; padding: 12px; background: color-mix(in srgb, var(--red) 10%, var(--surface)); border-radius: 8px; }
+  .batch-errors h4 { margin: 0 0 8px; color: var(--red); font-size: 13px; }
+  .batch-err-item { font-size: 12px; color: var(--text); margin-bottom: 4px; }
+  .collapsed-body { display: none; }
+
+  /* === Structured diff enhancements === */
+  .diff-step-match { border-left: 3px solid var(--green); }
+  .diff-step-added { border-left: 3px solid var(--accent); background: rgba(88,166,255,0.05); }
+  .diff-step-removed { border-left: 3px solid var(--red); background: rgba(248,81,73,0.05); }
+  .diff-step-changed { border-left: 3px solid var(--orange); background: rgba(210,153,34,0.05); }
+
   @media (max-width: 768px) {
     .container { padding: 12px; }
     header { padding: 12px 16px; }
@@ -1062,11 +1193,13 @@
 <div class="container">
   <div id="upload-zone" role="button" tabindex="0" aria-label="Upload a dialog.json or .zip trace file. Drop file here or press Enter to browse.">
     <div class="icon">&#128270;</div>
-    <div class="big">Drop a dialog.json or .zip file here, or click to upload</div>
-    <p>Exported conversation trace from Copilot Studio</p>
+    <div class="big">Drop dialog.json / .zip files here, or click to upload</div>
+    <p>Exported conversation trace from Copilot Studio &mdash; drop multiple files for batch analysis</p>
     <label for="file-input" class="hidden">Upload trace file</label>
-    <input type="file" id="file-input" accept=".json,.zip" aria-label="Upload trace file">
+    <input type="file" id="file-input" accept=".json,.zip" multiple aria-label="Upload trace file">
   </div>
+
+  <div id="batch-dashboard" class="batch-dashboard hidden"></div>
 
   <div class="app-layout" id="app-layout">
     <div class="trace-pane" id="trace-pane">
@@ -1075,9 +1208,13 @@
         <div class="conv-info" id="conv-info"></div>
         <div id="stats-panel" class="stats-panel hidden"></div>
         <div id="error-banner" class="error-banner hidden"></div>
+        <div id="waterfall-panel" class="waterfall-panel hidden"></div>
+        <div id="knowledge-panel" class="knowledge-panel hidden"></div>
+        <div id="flow-panel" class="flow-panel hidden"></div>
         <div class="filter-bar" id="filter-bar"></div>
         <div id="breadcrumb-bar" class="breadcrumb-bar empty"></div>
-        <div class="timeline" id="timeline"></div>
+        <div id="dep-legend" class="dep-legend hidden"></div>
+        <div class="timeline" id="timeline" style="position:relative;"></div>
       </div>
 
       <div id="compare-view" class="hidden"></div>
@@ -1103,6 +1240,11 @@
   const convInfo = document.getElementById('conv-info');
   const statsPanel = document.getElementById('stats-panel');
   const errorBanner = document.getElementById('error-banner');
+  const waterfallPanel = document.getElementById('waterfall-panel');
+  const knowledgePanel = document.getElementById('knowledge-panel');
+  const flowPanel = document.getElementById('flow-panel');
+  const batchDashboard = document.getElementById('batch-dashboard');
+  const depLegend = document.getElementById('dep-legend');
   const filterBar = document.getElementById('filter-bar');
   const breadcrumbBar = document.getElementById('breadcrumb-bar');
   const timeline = document.getElementById('timeline');
@@ -1146,9 +1288,15 @@
   uploadZone.addEventListener('drop', e => {
     e.preventDefault();
     uploadZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    const files = [...e.dataTransfer.files];
+    if (files.length > 1) handleBatch(files);
+    else if (files.length === 1) handleFile(files[0]);
   });
-  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+  fileInput.addEventListener('change', e => {
+    const files = [...e.target.files];
+    if (files.length > 1) handleBatch(files);
+    else if (files.length === 1) handleFile(files[0]);
+  });
 
   async function handleFile(file) {
     currentFileName = file.name;
@@ -1177,6 +1325,127 @@
       }
     };
     reader.readAsText(file);
+  }
+
+  // === #5: BATCH ANALYSIS ===
+  async function handleBatch(files) {
+    const results = [];
+    for (const file of files) {
+      const ext = file.name.toLowerCase().split('.').pop();
+      try {
+        let data;
+        if (ext === 'zip') {
+          const arrayBuf = await file.arrayBuffer();
+          const jsonText = await extractJsonFromZip(arrayBuf);
+          data = JSON.parse(jsonText);
+        } else {
+          const text = await file.text();
+          data = JSON.parse(text);
+        }
+        if (!data.activities || !data.activities.length) {
+          results.push({ name: file.name, error: 'No activities found' });
+        } else {
+          results.push({ name: file.name, data, acts: data.activities });
+        }
+      } catch(err) {
+        results.push({ name: file.name, error: err.message });
+      }
+    }
+    renderBatchDashboard(results);
+  }
+
+  function renderBatchDashboard(results) {
+    uploadZone.classList.add('hidden');
+    viewer.classList.add('hidden');
+    batchDashboard.classList.remove('hidden');
+
+    function batchStats(acts) {
+      let tsFirst = null, tsLast = null;
+      for (let i = 0; i < acts.length; i++) {
+        const t = acts[i].timestamp || acts[i].localTimestamp;
+        if (t) { tsFirst = new Date(t); break; }
+      }
+      for (let i = acts.length - 1; i >= 0; i--) {
+        const t = acts[i].timestamp || acts[i].localTimestamp;
+        if (t) { tsLast = new Date(t); break; }
+      }
+      const durationMs = tsFirst && tsLast ? (tsLast - tsFirst) : 0;
+      const dur = durationMs > 0 ? (durationMs / 1000).toFixed(1) + 's' : 'N/A';
+      const userTurns = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+      const errors = acts.filter(a => {
+        if (a.valueType === 'DialogTracingInfo' && a.value && a.value.actions) {
+          return a.value.actions.some(ac => ac.exception);
+        }
+        if (a.valueType === 'DynamicPlanStepFinished' && a.value) {
+          const st = (a.value.state || '').toLowerCase();
+          return st === 'error' || st === 'failed' || st === 'faulted';
+        }
+        return false;
+      }).length;
+      const plans = acts.filter(a => a.valueType === 'DynamicPlanReceived').length;
+      const steps = acts.filter(a => a.valueType === 'DynamicPlanStepTriggered').length;
+      return { total: acts.length, dur, durationMs, userTurns, errors, plans, steps };
+    }
+
+    const valid = results.filter(r => !r.error);
+    const errored = results.filter(r => r.error);
+    const statsArr = valid.map(r => ({ ...batchStats(r.acts), name: r.name }));
+
+    const totalActs = statsArr.reduce((s, r) => s + r.total, 0);
+    const totalErrors = statsArr.reduce((s, r) => s + r.errors, 0);
+    const avgDur = statsArr.length > 0 ? (statsArr.reduce((s, r) => s + r.durationMs, 0) / statsArr.length / 1000).toFixed(1) + 's' : 'N/A';
+    const maxDur = statsArr.length > 0 ? Math.max(...statsArr.map(r => r.durationMs)) : 0;
+    const slowest = statsArr.find(r => r.durationMs === maxDur);
+
+    let html = '<div class="batch-header"><h2>&#128202; Batch Analysis</h2><span>' + results.length + ' files</span>';
+    html += '<button class="toolbar-btn batch-back" id="batch-back-btn">&#8592; Back</button></div>';
+    html += '<div class="batch-stats">';
+    html += '<div class="batch-stat"><div class="batch-stat-val">' + valid.length + '</div><div class="batch-stat-lbl">Files Loaded</div></div>';
+    html += '<div class="batch-stat"><div class="batch-stat-val">' + totalActs + '</div><div class="batch-stat-lbl">Total Activities</div></div>';
+    html += '<div class="batch-stat"><div class="batch-stat-val' + (totalErrors > 0 ? ' bt-err' : '') + '">' + totalErrors + '</div><div class="batch-stat-lbl">Total Errors</div></div>';
+    html += '<div class="batch-stat"><div class="batch-stat-val">' + avgDur + '</div><div class="batch-stat-lbl">Avg Duration</div></div>';
+    if (slowest) {
+      html += '<div class="batch-stat"><div class="batch-stat-val">' + slowest.dur + '</div><div class="batch-stat-lbl">Slowest (' + escapeHtml(slowest.name.substring(0, 20)) + ')</div></div>';
+    }
+    html += '</div>';
+
+    // Table
+    html += '<table class="batch-table"><thead><tr><th>File</th><th>Activities</th><th>Duration</th><th>User Turns</th><th>Plans</th><th>Steps</th><th>Errors</th></tr></thead><tbody>';
+    statsArr.sort((a, b) => b.durationMs - a.durationMs).forEach((r, i) => {
+      const errCls = r.errors > 0 ? ' class="bt-err-row"' : '';
+      html += '<tr' + errCls + ' data-batch-idx="' + i + '" style="cursor:pointer;" title="Click to open"><td>' + escapeHtml(r.name) + '</td><td>' + r.total + '</td><td>' + r.dur + '</td><td>' + r.userTurns + '</td><td>' + r.plans + '</td><td>' + r.steps + '</td><td>' + (r.errors > 0 ? '<span class="bt-err">' + r.errors + '</span>' : '0') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    if (errored.length > 0) {
+      html += '<div class="batch-errors"><h4>&#9888; Failed Files</h4>';
+      errored.forEach(r => {
+        html += '<div class="batch-err-item"><strong>' + escapeHtml(r.name) + ':</strong> ' + escapeHtml(r.error) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    batchDashboard.innerHTML = html;
+
+    // Back button
+    batchDashboard.querySelector('#batch-back-btn').addEventListener('click', () => {
+      batchDashboard.classList.add('hidden');
+      batchDashboard.innerHTML = '';
+      uploadZone.classList.remove('hidden');
+    });
+
+    // Row click -> drill down
+    batchDashboard.querySelectorAll('tr[data-batch-idx]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const idx = parseInt(tr.getAttribute('data-batch-idx'));
+        const r = statsArr[idx];
+        const match = valid.find(v => v.name === r.name);
+        if (!match) return;
+        batchDashboard.classList.add('hidden');
+        currentFileName = match.name;
+        processDialog(match.data);
+      });
+    });
   }
 
   // ZIP extraction using JSZip-compatible minimal approach via native APIs
@@ -1651,7 +1920,7 @@
     }
 
     // Raw JSON toggle
-    html += '<div class="detail-section"><h4 style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle(\'hidden\')">&#9654; Raw JSON (click to expand)</h4><div class="detail-content hidden" style="max-height:400px;overflow:auto;font-family:monospace;font-size:11px;">' + escapeHtml(JSON.stringify(act, null, 2)) + '</div></div>';
+    html += '<div class="detail-section"><h4 style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle(\'hidden\')">&#9654; Raw JSON (click to expand)</h4><div class="detail-content hidden json-tree-root" style="max-height:400px;overflow:auto;" data-json-raw=""></div></div>';
 
     return html;
   }
@@ -1687,6 +1956,73 @@
     return h;
   }
 
+  // === Collapsible JSON tree builder (#12) ===
+  function buildJsonTree(val, key, depth) {
+    depth = depth || 0;
+    const maxAutoExpand = 2; // auto-expand first 2 levels
+    if (val === null) return '<span class="jt-null">null</span>';
+    if (val === undefined) return '<span class="jt-null">undefined</span>';
+    if (typeof val === 'string') return '<span class="jt-str">&quot;' + escapeHtml(val.length > 500 ? val.substring(0,500) + '...' : val) + '&quot;</span>';
+    if (typeof val === 'number') return '<span class="jt-num">' + val + '</span>';
+    if (typeof val === 'boolean') return '<span class="jt-bool">' + val + '</span>';
+    const isArr = Array.isArray(val);
+    const entries = isArr ? val.map((v,i) => [i,v]) : Object.entries(val);
+    if (entries.length === 0) return isArr ? '<span class="jt-null">[]</span>' : '<span class="jt-null">{}</span>';
+    const collapsed = depth >= maxAutoExpand ? ' jt-collapsed' : ' jt-expanded';
+    let html = '<div class="jt-node' + collapsed + '">';
+    html += '<span class="jt-toggle">' + (isArr ? '[' + entries.length + ']' : '{' + entries.length + '}') + '</span>';
+    html += '<div class="jt-children">';
+    entries.forEach(([k, v]) => {
+      html += '<div class="jt-entry">';
+      html += '<span class="jt-key">' + escapeHtml(String(k)) + '</span>: ';
+      html += buildJsonTree(v, k, depth + 1);
+      html += '</div>';
+    });
+    html += '</div>';
+    if (depth >= maxAutoExpand) html += '<span class="jt-ellipsis">...</span>';
+    html += '</div>';
+    return html;
+  }
+
+  function initJsonTrees(container) {
+    container.querySelectorAll('.json-tree-root').forEach(el => {
+      if (el._jsonInitDone) return;
+      el._jsonInitDone = true;
+      // Lazy-init: populate on first toggle (when user clicks "Raw JSON")
+      const h4 = el.previousElementSibling;
+      if (!h4) return;
+      const origClick = h4.getAttribute('onclick');
+      h4.removeAttribute('onclick');
+      h4.addEventListener('click', function handler() {
+        el.classList.toggle('hidden');
+        if (!el._jsonBuilt && el._jsonData) {
+          el.innerHTML = '<div class="json-tree">' + buildJsonTree(el._jsonData) + '</div>';
+          el._jsonBuilt = true;
+          // Wire toggle clicks
+          el.querySelectorAll('.jt-toggle').forEach(t => {
+            t.addEventListener('click', () => {
+              const node = t.closest('.jt-node');
+              if (node.classList.contains('jt-collapsed')) {
+                node.classList.remove('jt-collapsed');
+                node.classList.add('jt-expanded');
+              } else {
+                node.classList.remove('jt-expanded');
+                node.classList.add('jt-collapsed');
+              }
+            });
+          });
+          el.querySelectorAll('.jt-ellipsis').forEach(e => {
+            e.addEventListener('click', () => {
+              const node = e.closest('.jt-node');
+              node.classList.remove('jt-collapsed');
+              node.classList.add('jt-expanded');
+            });
+          });
+        }
+      });
+    });
+  }
+
   function resetViewer() {
     viewer.classList.add('hidden');
     uploadZone.classList.remove('hidden');
@@ -1696,6 +2032,16 @@
     statsPanel.classList.add('hidden');
     errorBanner.innerHTML = '';
     errorBanner.classList.add('hidden');
+    waterfallPanel.innerHTML = '';
+    waterfallPanel.classList.add('hidden');
+    knowledgePanel.innerHTML = '';
+    knowledgePanel.classList.add('hidden');
+    flowPanel.innerHTML = '';
+    flowPanel.classList.add('hidden');
+    depLegend.innerHTML = '';
+    depLegend.classList.add('hidden');
+    batchDashboard.innerHTML = '';
+    batchDashboard.classList.add('hidden');
     breadcrumbBar.innerHTML = '';
     breadcrumbBar.classList.add('empty');
     filterBar.innerHTML = '';
@@ -1774,16 +2120,25 @@
     compareBtn.addEventListener('click', () => enterCompareMode(data));
     toolbar.appendChild(compareBtn);
 
-    // Search box
+    // Search box with regex toggle
     const searchBox = document.createElement('div');
     searchBox.className = 'search-box';
-    searchBox.innerHTML = '<span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="Search steps..."><span class="search-count" id="search-count"></span>';
+    searchBox.innerHTML = '<span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="Search steps..."><button class="regex-toggle" id="regex-toggle" title="Toggle regex mode">.*</button><span class="search-count" id="search-count"></span>';
     // Insert before spacer
     toolbar.insertBefore(searchBox, spacer);
 
     const searchInput = document.getElementById('search-input');
     const searchCount = document.getElementById('search-count');
+    const regexToggle = document.getElementById('regex-toggle');
     let searchDebounce = null;
+    let regexMode = false;
+
+    regexToggle.addEventListener('click', () => {
+      regexMode = !regexMode;
+      regexToggle.classList.toggle('active', regexMode);
+      searchInput.placeholder = regexMode ? 'Regex search...' : 'Search steps...';
+      if (searchInput.value.trim()) applySearch(searchInput.value.trim());
+    });
 
     searchInput.addEventListener('input', () => {
       clearTimeout(searchDebounce);
@@ -1817,6 +2172,11 @@
         return;
       }
 
+      let rx = null;
+      if (regexMode) {
+        try { rx = new RegExp(query, 'gi'); }
+        catch(e) { searchCount.textContent = 'Invalid regex'; return; }
+      }
       const lq = query.toLowerCase();
       let matchCount = 0;
       const allSteps = timeline.querySelectorAll('.step');
@@ -1830,14 +2190,17 @@
         let badgeText = '';
         badges.forEach(b => badgeText += ' ' + b.textContent);
 
-        const fullText = (titleText + ' ' + badgeText + ' ' + detailText).toLowerCase();
+        const fullText = titleText + ' ' + badgeText + ' ' + detailText;
+        const isMatch = rx ? rx.test(fullText) : fullText.toLowerCase().includes(lq);
+        if (rx) rx.lastIndex = 0; // reset global regex
 
-        if (fullText.includes(lq)) {
+        if (isMatch) {
           matchCount++;
           stepEl.classList.remove('search-hidden');
-          // Highlight in title
-          if (titleEl && titleText.toLowerCase().includes(lq)) {
-            highlightTextInEl(titleEl, query);
+          if (titleEl) {
+            const titleMatch = rx ? rx.test(titleText) : titleText.toLowerCase().includes(lq);
+            if (rx) rx.lastIndex = 0;
+            if (titleMatch) highlightTextInEl(titleEl, query, rx);
           }
         } else {
           stepEl.classList.add('search-hidden');
@@ -1854,17 +2217,25 @@
       searchCount.textContent = matchCount + ' match' + (matchCount !== 1 ? 'es' : '');
     }
 
-    function highlightTextInEl(el, query) {
-      // Only operate on the first text node to avoid destroying child elements (pills, badges)
+    function highlightTextInEl(el, query, rx) {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
       let node;
       while (node = walker.nextNode()) {
         const text = node.nodeValue;
-        const idx = text.toLowerCase().indexOf(query.toLowerCase());
-        if (idx === -1) continue;
+        let idx, matchLen;
+        if (rx) {
+          rx.lastIndex = 0;
+          const m = rx.exec(text);
+          if (!m) continue;
+          idx = m.index; matchLen = m[0].length;
+        } else {
+          idx = text.toLowerCase().indexOf(query.toLowerCase());
+          if (idx === -1) continue;
+          matchLen = query.length;
+        }
         const before = text.substring(0, idx);
-        const match = text.substring(idx, idx + query.length);
-        const after = text.substring(idx + query.length);
+        const match = text.substring(idx, idx + matchLen);
+        const after = text.substring(idx + matchLen);
         const span = document.createElement('span');
         span.className = 'search-highlight';
         span.textContent = match;
@@ -2246,6 +2617,10 @@
       stepHeader.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStep(); }
       });
+      // Attach JSON data for collapsible tree (lazy init)
+      const jsonRoot = step.querySelector('.json-tree-root');
+      if (jsonRoot) jsonRoot._jsonData = act;
+      initJsonTrees(step);
       return step;
     }
 
@@ -2774,6 +3149,357 @@
       });
     })();
 
+    // === #13: STEP-TO-STEP DEPENDENCY LINES ===
+    (function initDepLines() {
+      // Build a map of stepId -> { triggered: stepEl, finished: stepEl, state }
+      const stepMap = {};
+      timeline.querySelectorAll('.step').forEach(el => {
+        const act = el._actRef;
+        if (!act || !act.value) return;
+        const vt = act.valueType || '';
+        const sid = act.value.stepId;
+        if (!sid) return;
+        if (vt === 'DynamicPlanStepTriggered') {
+          if (!stepMap[sid]) stepMap[sid] = {};
+          stepMap[sid].triggered = el;
+          stepMap[sid].taskId = act.value.taskDialogId || '';
+        }
+        if (vt === 'DynamicPlanStepFinished') {
+          if (!stepMap[sid]) stepMap[sid] = {};
+          stepMap[sid].finished = el;
+          stepMap[sid].state = (act.value.state || '').toLowerCase();
+        }
+      });
+
+      const entries = Object.values(stepMap);
+      if (entries.length === 0) return;
+
+      // Show legend
+      depLegend.classList.remove('hidden');
+      depLegend.innerHTML = '<span class="dep-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="var(--green)" stroke-width="2"/></svg> Completed</span>' +
+        '<span class="dep-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="var(--red)" stroke-width="2" stroke-dasharray="4,3"/></svg> Failed</span>' +
+        '<span class="dep-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="var(--orange)" stroke-width="2" stroke-dasharray="6,3"/></svg> No completion</span>';
+
+      // Create SVG overlay
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('dep-lines-svg');
+      timeline.appendChild(svg);
+
+      function drawLines() {
+        svg.innerHTML = '';
+        svg.style.height = timeline.scrollHeight + 'px';
+        const tlRect = timeline.getBoundingClientRect();
+
+        entries.forEach(entry => {
+          const startEl = entry.triggered;
+          if (!startEl) return;
+          const startRect = startEl.getBoundingClientRect();
+          if (startRect.height === 0) return; // hidden
+          const y1 = startRect.top - tlRect.top + startRect.height / 2;
+          const x1 = 20;
+
+          let cls, y2;
+          if (entry.finished) {
+            const endRect = entry.finished.getBoundingClientRect();
+            if (endRect.height === 0) return;
+            y2 = endRect.top - tlRect.top + endRect.height / 2;
+            const st = entry.state;
+            cls = (st === 'failed' || st === 'error' || st === 'faulted') ? 'dep-failed' : 'dep-complete';
+          } else {
+            // Orphan: draw dashed line to +30px
+            y2 = y1 + 30;
+            cls = 'dep-orphan';
+          }
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', x1);
+          line.setAttribute('y1', y1);
+          line.setAttribute('x2', x1);
+          line.setAttribute('y2', y2);
+          line.setAttribute('class', 'dep-line ' + cls);
+          svg.appendChild(line);
+
+          // End marker
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', x1);
+          circle.setAttribute('cy', y2);
+          circle.setAttribute('r', entry.finished ? 3 : 0);
+          circle.setAttribute('class', 'dep-marker ' + cls);
+          svg.appendChild(circle);
+        });
+      }
+      drawLines();
+      // Redraw on expand/collapse
+      const observer = new MutationObserver(() => requestAnimationFrame(drawLines));
+      observer.observe(timeline, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    })();
+
+    // === #1: PERFORMANCE WATERFALL ===
+    (function initWaterfall() {
+      const stepEvents = activities.filter(a => a.valueType === 'DynamicPlanStepTriggered' || a.valueType === 'DynamicPlanStepFinished');
+      if (stepEvents.length < 2) return;
+
+      // Build step timeline
+      const stepPairs = {};
+      stepEvents.forEach(a => {
+        const sid = a.value.stepId;
+        if (!stepPairs[sid]) stepPairs[sid] = {};
+        if (a.valueType === 'DynamicPlanStepTriggered') {
+          stepPairs[sid].start = getTs(a);
+          stepPairs[sid].name = a.value.taskDialogId || sid.substring(0,8);
+          stepPairs[sid].type = a.value.type || 'Unknown';
+        }
+        if (a.valueType === 'DynamicPlanStepFinished') {
+          stepPairs[sid].end = getTs(a);
+          stepPairs[sid].state = a.value.state || '';
+        }
+      });
+
+      const rows = Object.entries(stepPairs).map(([sid, p]) => ({
+        sid, name: p.name || sid.substring(0,8), type: p.type || '',
+        start: p.start ? new Date(p.start).getTime() : null,
+        end: p.end ? new Date(p.end).getTime() : (p.start ? new Date(p.start).getTime() + 100 : null),
+        state: (p.state || '').toLowerCase(),
+      })).filter(r => r.start !== null);
+
+      if (rows.length === 0) return;
+
+      const globalStart = Math.min(...rows.map(r => r.start));
+      const globalEnd = Math.max(...rows.map(r => r.end));
+      const totalMs = globalEnd - globalStart || 1;
+
+      const colorMap = { 'agent': 'var(--purple)', 'agentdialog': 'var(--purple)', 'unknown': 'var(--cyan)' };
+      function barColor(type, state) {
+        if (state === 'failed' || state === 'error' || state === 'faulted') return 'var(--red)';
+        const lt = (type || '').toLowerCase();
+        return colorMap[lt] || 'var(--accent)';
+      }
+
+      waterfallPanel.classList.remove('hidden');
+      let collapsed = false;
+      waterfallPanel.innerHTML = '<div class="waterfall-header"><h3>&#9202; Performance Waterfall</h3><span style="font-size:12px;color:var(--text-muted);">' + rows.length + ' steps &middot; ' + (totalMs/1000).toFixed(1) + 's total</span></div><div class="waterfall-body"><div class="waterfall-chart" id="wf-chart"></div><div class="wf-time-axis" id="wf-axis"></div></div><div class="wf-legend" id="wf-legend"></div>';
+
+      const wfChart = waterfallPanel.querySelector('#wf-chart');
+      const wfAxis = waterfallPanel.querySelector('#wf-axis');
+      const wfLegend = waterfallPanel.querySelector('#wf-legend');
+
+      rows.forEach(r => {
+        const leftPct = ((r.start - globalStart) / totalMs * 100);
+        const widthPct = Math.max(0.5, (r.end - r.start) / totalMs * 100);
+        const durLabel = ((r.end - r.start) / 1000).toFixed(1) + 's';
+        const row = document.createElement('div');
+        row.className = 'wf-row';
+        row.innerHTML = '<div class="wf-label" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name.split('.').pop()) + '</div>' +
+          '<div class="wf-track"><div class="wf-bar" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + barColor(r.type, r.state) + ';" title="' + escapeHtml(r.name) + ': ' + durLabel + '">' +
+          '<span class="wf-bar-label">' + durLabel + '</span></div></div>';
+        wfChart.appendChild(row);
+      });
+
+      // Time axis
+      const ticks = 5;
+      for (let i = 0; i <= ticks; i++) {
+        const t = (totalMs / ticks * i / 1000).toFixed(1);
+        const span = document.createElement('span');
+        span.textContent = t + 's';
+        wfAxis.appendChild(span);
+      }
+
+      // Legend
+      const types = [...new Set(rows.map(r => r.type))];
+      types.forEach(t => {
+        const lt = (t || '').toLowerCase();
+        const c = colorMap[lt] || 'var(--accent)';
+        wfLegend.innerHTML += '<span class="wf-legend-item"><span class="wf-legend-dot" style="background:' + c + '"></span>' + escapeHtml(t || 'Step') + '</span>';
+      });
+      if (rows.some(r => r.state === 'failed' || r.state === 'error')) {
+        wfLegend.innerHTML += '<span class="wf-legend-item"><span class="wf-legend-dot" style="background:var(--red)"></span>Failed</span>';
+      }
+
+      // Toggle collapse
+      waterfallPanel.querySelector('.waterfall-header').addEventListener('click', () => {
+        collapsed = !collapsed;
+        waterfallPanel.querySelector('.waterfall-body').style.display = collapsed ? 'none' : '';
+        waterfallPanel.querySelector('.wf-legend').style.display = collapsed ? 'none' : '';
+      });
+    })();
+
+    // === #3: KNOWLEDGE SOURCE ANALYSIS ===
+    (function initKnowledgeAnalysis() {
+      const searchTraces = activities.filter(a => a.valueType === 'UniversalSearchToolTraceData');
+      const bindUpdates = activities.filter(a => a.valueType === 'DynamicPlanStepBindUpdate');
+      const stepFinished = activities.filter(a => a.valueType === 'DynamicPlanStepFinished' && a.value && a.value.observation);
+
+      if (searchTraces.length === 0 && stepFinished.length === 0) return;
+
+      knowledgePanel.classList.remove('hidden');
+      let collapsed = false;
+
+      // Aggregate knowledge sources
+      const sourceCounts = {};
+      searchTraces.forEach(a => {
+        const v = a.value || {};
+        (v.outputKnowledgeSources || []).forEach(s => {
+          const short = s.split('.').pop();
+          sourceCounts[short] = (sourceCounts[short] || 0) + 1;
+        });
+      });
+
+      // Aggregate search results / documents
+      const docCounts = {};
+      const emptySearches = [];
+      stepFinished.forEach(a => {
+        const obs = a.value.observation;
+        if (obs && obs.search_result && obs.search_result.search_results) {
+          const results = obs.search_result.search_results;
+          if (results.length === 0) {
+            emptySearches.push(a.value.taskDialogId || 'Unknown');
+          }
+          results.forEach(r => {
+            const name = r.Name || 'Unknown';
+            if (!docCounts[name]) docCounts[name] = { count: 0, type: r.FileType || '', url: r.Url || '' };
+            docCounts[name].count++;
+          });
+        }
+      });
+
+      // Aggregate search queries
+      const queries = [];
+      bindUpdates.forEach(a => {
+        const args = a.value && a.value.arguments;
+        if (args) {
+          if (args.search_query) queries.push(args.search_query);
+          else if (args.Task) queries.push(args.Task);
+        }
+      });
+
+      let html = '<div class="knowledge-header"><h3>&#128218; Knowledge Sources</h3><span style="font-size:12px;color:var(--text-muted);">' + searchTraces.length + ' searches</span></div><div class="knowledge-body" id="kb-body">';
+
+      if (queries.length > 0) {
+        html += '<div class="ks-section"><h4>Search Queries</h4>';
+        queries.forEach(q => { html += '<div class="ks-query">' + escapeHtml(q) + '</div>'; });
+        html += '</div>';
+      }
+
+      if (Object.keys(sourceCounts).length > 0) {
+        html += '<div class="ks-section"><h4>Knowledge Sources</h4>';
+        Object.entries(sourceCounts).sort((a,b) => b[1]-a[1]).forEach(([name, count]) => {
+          html += '<div class="ks-item"><span class="ks-name">' + escapeHtml(name) + '</span><span class="ks-count">' + count + '</span></div>';
+        });
+        html += '</div>';
+      }
+
+      if (Object.keys(docCounts).length > 0) {
+        html += '<div class="ks-section"><h4>Documents Retrieved</h4>';
+        Object.entries(docCounts).sort((a,b) => b[1].count - a[1].count).forEach(([name, info]) => {
+          html += '<div class="ks-item"><span class="ks-name" title="' + escapeHtml(info.url) + '">' + escapeHtml(name) + ' <small>(' + escapeHtml(info.type) + ')</small></span><span class="ks-count">' + info.count + '</span></div>';
+        });
+        html += '</div>';
+      }
+
+      if (emptySearches.length > 0) {
+        html += '<div class="ks-section"><h4>&#9888; Empty Search Results</h4>';
+        emptySearches.forEach(t => { html += '<div class="ks-item ks-empty"><span class="ks-name">' + escapeHtml(t) + ' returned 0 results</span></div>'; });
+        html += '</div>';
+      }
+
+      html += '</div>';
+      knowledgePanel.innerHTML = html;
+
+      knowledgePanel.querySelector('.knowledge-header').addEventListener('click', () => {
+        collapsed = !collapsed;
+        knowledgePanel.querySelector('#kb-body').classList.toggle('collapsed-body', collapsed);
+      });
+    })();
+
+    // === #4: CONVERSATION FLOW DIAGRAM ===
+    (function initFlowDiagram() {
+      const dialogTraces = activities.filter(a => a.valueType === 'DialogTracingInfo' && a.value && a.value.actions);
+      if (dialogTraces.length === 0) return;
+
+      // Extract topic transitions
+      const nodes = new Set();
+      const edges = []; // { from, to, action }
+      let prevTopic = null;
+      dialogTraces.forEach(a => {
+        (a.value.actions || []).forEach(action => {
+          const topicId = action.topicId || '';
+          const shortTopic = topicId.split('.').pop() || topicId;
+          if (!shortTopic) return;
+          nodes.add(shortTopic);
+          if (prevTopic && prevTopic !== shortTopic) {
+            edges.push({ from: prevTopic, to: shortTopic, action: action.actionType || '' });
+          }
+          prevTopic = shortTopic;
+        });
+      });
+
+      if (nodes.size === 0) return;
+
+      flowPanel.classList.remove('hidden');
+      let collapsed = false;
+
+      // Simple layout: nodes in a row, edges as curved arrows
+      const nodeArr = [...nodes];
+      const nodeW = 120, nodeH = 36, gapX = 40, gapY = 60;
+      const cols = Math.min(nodeArr.length, 5);
+      const rowCount = Math.ceil(nodeArr.length / cols);
+      const svgW = cols * (nodeW + gapX) + gapX;
+      const svgH = rowCount * (nodeH + gapY) + gapY + 20;
+
+      const nodePos = {};
+      nodeArr.forEach((n, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        nodePos[n] = { x: gapX + col * (nodeW + gapX), y: gapY + row * (nodeH + gapY) };
+      });
+
+      // Deduplicate edges
+      const edgeKey = (e) => e.from + '->' + e.to;
+      const edgeMap = {};
+      edges.forEach(e => {
+        const k = edgeKey(e);
+        if (!edgeMap[k]) edgeMap[k] = { ...e, count: 0 };
+        edgeMap[k].count++;
+      });
+      const dedupEdges = Object.values(edgeMap);
+
+      let svgHtml = '<svg class="flow-svg" width="' + svgW + '" height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '">';
+      svgHtml += '<defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="var(--text-muted)"/></marker></defs>';
+
+      // Draw edges
+      dedupEdges.forEach(e => {
+        const from = nodePos[e.from];
+        const to = nodePos[e.to];
+        if (!from || !to) return;
+        const x1 = from.x + nodeW / 2, y1 = from.y + nodeH;
+        const x2 = to.x + nodeW / 2, y2 = to.y;
+        const midY = (y1 + y2) / 2;
+        svgHtml += '<path d="M' + x1 + ',' + y1 + ' C' + x1 + ',' + midY + ' ' + x2 + ',' + midY + ' ' + x2 + ',' + y2 + '" fill="none" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.6"/>';
+        // Edge label
+        const mx = (x1 + x2) / 2, my = midY - 6;
+        if (e.action) {
+          svgHtml += '<text x="' + mx + '" y="' + my + '" font-size="9" fill="var(--text-muted)" text-anchor="middle">' + escapeHtml(e.action) + (e.count > 1 ? ' x' + e.count : '') + '</text>';
+        }
+      });
+
+      // Draw nodes
+      nodeArr.forEach(n => {
+        const p = nodePos[n];
+        const isError = n === 'Fallback';
+        svgHtml += '<rect x="' + p.x + '" y="' + p.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="6" fill="' + (isError ? 'var(--red)' : 'var(--surface2)') + '" stroke="var(--border)" stroke-width="1"/>';
+        svgHtml += '<text x="' + (p.x + nodeW/2) + '" y="' + (p.y + nodeH/2 + 4) + '" font-size="11" fill="' + (isError ? '#fff' : 'var(--text)') + '" text-anchor="middle">' + escapeHtml(n.length > 16 ? n.substring(0,14) + '..' : n) + '</text>';
+      });
+
+      svgHtml += '</svg>';
+
+      flowPanel.innerHTML = '<div class="flow-header"><h3>&#128256; Topic Flow</h3><span style="font-size:12px;color:var(--text-muted);">' + nodeArr.length + ' topics, ' + dedupEdges.length + ' transitions</span></div><div class="flow-body" id="flow-body">' + svgHtml + '</div>';
+
+      flowPanel.querySelector('.flow-header').addEventListener('click', () => {
+        collapsed = !collapsed;
+        flowPanel.querySelector('#flow-body').classList.toggle('collapsed-body', collapsed);
+      });
+    })();
+
     // === AUTO-EXPAND ERRORS / COLLAPSE ALL ===
     if (issues.length > 0) {
       // Auto-expand steps that have issues
@@ -2947,6 +3673,14 @@
     // Remove breadcrumb bar
     const bc = clone.querySelector('.breadcrumb-bar');
     if (bc) bc.remove();
+    // Remove interactive dep-lines SVG (static snapshot) and resize handle
+    clone.querySelectorAll('.dep-lines-svg').forEach(el => el.remove());
+    clone.querySelectorAll('.resize-handle').forEach(el => el.remove());
+    // Ensure new panels are visible in export
+    clone.querySelectorAll('.waterfall-panel,.knowledge-panel,.flow-panel,.dep-legend').forEach(el => {
+      el.classList.remove('hidden');
+      el.querySelectorAll('.collapsed-body').forEach(b => b.classList.remove('collapsed-body'));
+    });
     // Expand all steps and plan groups for the report
     clone.querySelectorAll('.plan-group.collapsed').forEach(pg => pg.classList.remove('collapsed'));
     // Keep steps collapsed in export (user can toggle via inline script)
@@ -3158,7 +3892,7 @@ ${toggleScript}
       const container = document.createElement('div');
       container.className = 'compare-container';
 
-      function buildPane(acts, fileName, labelCls) {
+      function buildPane(acts, fileName, labelCls, matchArr) {
         const pane = document.createElement('div');
         pane.className = 'compare-pane';
 
@@ -3175,13 +3909,14 @@ ${toggleScript}
         const tl = document.createElement('div');
         tl.className = 'timeline';
 
-        acts.forEach(act => {
+        acts.forEach((act, idx) => {
           const cls = classifyActivity(act);
           const title = buildTitle(act, cls);
           const ts = getTs(act);
+          const diffCls = matchArr && matchArr[idx] ? ' diff-step-' + matchArr[idx] : '';
 
           const step = document.createElement('div');
-          step.className = 'step type-' + cls.cat;
+          step.className = 'step type-' + cls.cat + diffCls;
           step.innerHTML = `
             <div class="dot"></div>
             <div class="step-card">
@@ -3202,9 +3937,70 @@ ${toggleScript}
         return pane;
       }
 
-      container.appendChild(buildPane(actsA, fnA, 'pane-label-a'));
-      container.appendChild(buildPane(actsB, fnB, 'pane-label-b'));
+      // === #6: STRUCTURED DIFF ===
+      // Semantic matching: match activities by valueType + sequence position
+      function fingerprint(act) {
+        const vt = act.valueType || act.type || '';
+        const role = (act.from && act.from.role) || '';
+        return vt + '|' + role;
+      }
+
+      // LCS-based diff for semantic matching
+      function computeDiff(seqA, seqB) {
+        const fpA = seqA.map(fingerprint);
+        const fpB = seqB.map(fingerprint);
+        const nA = fpA.length, nB = fpB.length;
+        // LCS table
+        const dp = Array.from({ length: nA + 1 }, () => new Uint16Array(nB + 1));
+        for (let i = 1; i <= nA; i++) {
+          for (let j = 1; j <= nB; j++) {
+            dp[i][j] = fpA[i-1] === fpB[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+          }
+        }
+        // Backtrack: build match map
+        const matchA = new Array(nA).fill(null); // matchA[i] = 'match'|'changed'|'removed'
+        const matchB = new Array(nB).fill(null);
+        let i = nA, j = nB;
+        while (i > 0 && j > 0) {
+          if (fpA[i-1] === fpB[j-1]) {
+            // Check if values differ (changed vs match)
+            const strA = JSON.stringify(seqA[i-1].value || {});
+            const strB = JSON.stringify(seqB[j-1].value || {});
+            matchA[i-1] = strA === strB ? 'match' : 'changed';
+            matchB[j-1] = matchA[i-1];
+            i--; j--;
+          } else if (dp[i-1][j] >= dp[i][j-1]) {
+            matchA[i-1] = 'removed';
+            i--;
+          } else {
+            matchB[j-1] = 'added';
+            j--;
+          }
+        }
+        while (i > 0) { matchA[--i] = 'removed'; }
+        while (j > 0) { matchB[--j] = 'added'; }
+        return { matchA, matchB };
+      }
+
+      const diff = computeDiff(actsA, actsB);
+
+      container.appendChild(buildPane(actsA, fnA, 'pane-label-a', diff.matchA));
+      container.appendChild(buildPane(actsB, fnB, 'pane-label-b', diff.matchB));
       compareView.appendChild(container);
+
+      // Sync scroll between panes
+      const panes = container.querySelectorAll('.pane-body');
+      if (panes.length === 2) {
+        let syncing = false;
+        panes.forEach((p, idx) => {
+          p.addEventListener('scroll', () => {
+            if (syncing) return;
+            syncing = true;
+            panes[1 - idx].scrollTop = p.scrollTop;
+            syncing = false;
+          });
+        });
+      }
     }
   }
 })();
