@@ -1104,6 +1104,41 @@
   .flow-svg .flow-handoff-edge { stroke-dasharray: 6,3; }
   .flow-svg .flow-return-edge { stroke-dasharray: 3,3; }
 
+  /* === Variable State Tracker === */
+  .variables-panel {
+    margin: 16px 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .variables-panel.hidden { display: none; }
+  .variables-header {
+    padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  }
+  .variables-header h3 { font-size: 14px; color: var(--heading); }
+  .variables-body { padding: 12px; }
+  .variables-body.collapsed-body { display: none; }
+  .var-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .var-table th { text-align: left; padding: 6px 10px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); }
+  .var-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .var-table tr:last-child td { border-bottom: none; }
+  .var-scope-row td { background: var(--surface2); font-weight: 600; color: var(--heading); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .var-name { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; color: var(--accent); }
+  .var-type { font-size: 10px; color: var(--text-muted); background: var(--surface2); padding: 1px 6px; border-radius: 3px; }
+  .var-desc { font-size: 11px; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .var-timeline { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .var-snapshot { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border); }
+  .var-snapshot .var-step-idx { color: var(--text-muted); font-size: 9px; }
+  .var-snapshot .var-val { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; color: var(--text); }
+  .var-snapshot.var-changed { border-color: var(--accent); background: rgba(88,166,255,0.08); }
+  .var-snapshot.var-changed .var-val { color: var(--accent); font-weight: 600; }
+  .var-arrow { color: var(--text-muted); font-size: 10px; }
+  .var-badge-in { font-size: 9px; color: var(--green); border: 1px solid var(--green); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+  .var-badge-out { font-size: 9px; color: var(--purple); border: 1px solid var(--purple); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+  .var-state-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .var-state-section h4 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .var-state-kv { display: flex; gap: 8px; flex-wrap: wrap; }
+  .var-state-chip { font-size: 11px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; padding: 2px 8px; background: var(--surface2); border-radius: 4px; border: 1px solid var(--border); }
+
   /* === Dependency lines === */
   .dep-lines-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
   .dep-line { fill: none; stroke-width: 1.5; opacity: 0.5; }
@@ -1215,6 +1250,7 @@
         <div id="waterfall-panel" class="waterfall-panel hidden"></div>
         <div id="knowledge-panel" class="knowledge-panel hidden"></div>
         <div id="flow-panel" class="flow-panel hidden"></div>
+        <div id="variables-panel" class="variables-panel hidden"></div>
         <div class="filter-bar" id="filter-bar"></div>
         <div id="breadcrumb-bar" class="breadcrumb-bar empty"></div>
         <div id="dep-legend" class="dep-legend hidden"></div>
@@ -1247,6 +1283,7 @@
   const waterfallPanel = document.getElementById('waterfall-panel');
   const knowledgePanel = document.getElementById('knowledge-panel');
   const flowPanel = document.getElementById('flow-panel');
+  const variablesPanel = document.getElementById('variables-panel');
   const batchDashboard = document.getElementById('batch-dashboard');
   const depLegend = document.getElementById('dep-legend');
   const filterBar = document.getElementById('filter-bar');
@@ -2042,6 +2079,8 @@
     knowledgePanel.classList.add('hidden');
     flowPanel.innerHTML = '';
     flowPanel.classList.add('hidden');
+    variablesPanel.innerHTML = '';
+    variablesPanel.classList.add('hidden');
     depLegend.innerHTML = '';
     depLegend.classList.add('hidden');
     batchDashboard.innerHTML = '';
@@ -3655,6 +3694,265 @@
       });
     })();
 
+    // === #4: VARIABLE STATE TRACKER ===
+    (function initVariableTracker() {
+      // 1. Collect variable declarations from DynamicPlanReceived toolDefinitions
+      const varDeclarations = {}; // key = "schemaName::varName" → { name, type, desc, direction, topic, planId }
+      const planTopicMap = {}; // planIdentifier → { schemaName, displayName }
+
+      activities.forEach(a => {
+        if (a.valueType !== 'DynamicPlanReceived') return;
+        const v = a.value;
+        if (!v.toolDefinitions) return;
+        v.toolDefinitions.forEach(td => {
+          const schema = td.schemaName || '';
+          const display = td.displayName || schema.split('.').pop();
+          // Map each step in this plan to its display info
+          if (v.planIdentifier) planTopicMap[v.planIdentifier] = { schemaName: schema, displayName: display };
+
+          if (td.inputs) {
+            td.inputs.forEach(inp => {
+              const key = schema + '::' + inp.name;
+              if (!varDeclarations[key]) {
+                varDeclarations[key] = {
+                  name: inp.name,
+                  type: (inp.type && inp.type.$kind) || 'Unknown',
+                  desc: inp.description || '',
+                  direction: 'input',
+                  topic: display,
+                  schemaName: schema,
+                  propertyName: inp.propertyName || inp.name
+                };
+              }
+            });
+          }
+          if (td.outputs) {
+            td.outputs.forEach(out => {
+              const key = schema + '::' + out.name;
+              if (!varDeclarations[key]) {
+                varDeclarations[key] = {
+                  name: out.name,
+                  type: (out.type && out.type.$kind) || 'Unknown',
+                  desc: out.description || '',
+                  direction: 'output',
+                  topic: display,
+                  schemaName: schema,
+                  propertyName: out.propertyName || out.name
+                };
+              }
+            });
+          }
+        });
+      });
+
+      // 2. Track value evolution via DynamicPlanStepBindUpdate
+      // Group by stepId → ordered list of argument snapshots
+      const bindUpdates = []; // { idx, stepId, taskDialogId, arguments, planId, autoFilled }
+      let actIdx = 0;
+      activities.forEach(a => {
+        if (a.valueType === 'DynamicPlanStepBindUpdate') {
+          bindUpdates.push({
+            idx: actIdx,
+            stepId: a.value.stepId,
+            taskDialogId: a.value.taskDialogId,
+            args: a.value.arguments || {},
+            planId: a.value.planIdentifier,
+            autoFilled: a.value.autoFilledArguments || [],
+            isConnected: !!a.isConnectedAgentActivity
+          });
+        }
+        actIdx++;
+      });
+
+      // Group bind updates by taskDialogId (all BindUpdates for the same task)
+      const bindByTask = {};
+      bindUpdates.forEach(bu => {
+        const key = bu.taskDialogId;
+        if (!bindByTask[key]) bindByTask[key] = [];
+        bindByTask[key].push(bu);
+      });
+
+      // 3. Collect DialogTracingInfo variableState (dialogState / globalState)
+      const dialogStates = []; // { idx, topicId, actionId, actionType, dialogState, globalState }
+      actIdx = 0;
+      activities.forEach(a => {
+        if (a.valueType === 'DialogTracingInfo' && a.value && a.value.actions) {
+          a.value.actions.forEach(action => {
+            const ds = action.variableState ? action.variableState.dialogState : null;
+            const gs = action.variableState ? action.variableState.globalState : null;
+            const hasDs = ds && Object.keys(ds).length > 0;
+            const hasGs = gs && Object.keys(gs).length > 0;
+            if (hasDs || hasGs) {
+              dialogStates.push({
+                idx: actIdx,
+                topicId: action.topicId || '',
+                actionId: action.actionId || '',
+                actionType: action.actionType || '',
+                dialogState: ds,
+                globalState: gs
+              });
+            }
+          });
+        }
+        actIdx++;
+      });
+
+      // Build variable evolution from bind updates
+      // For each declared variable, find matching BindUpdate snapshots
+      const varEvolution = {}; // key same as varDeclarations → [{ idx, value }]
+      Object.keys(varDeclarations).forEach(key => {
+        const decl = varDeclarations[key];
+        const taskBinds = bindByTask[decl.schemaName];
+        if (!taskBinds) return;
+        const snapshots = [];
+        taskBinds.forEach(bu => {
+          const propName = decl.propertyName || decl.name;
+          // Check if this argument set has the variable
+          if (propName in bu.args) {
+            snapshots.push({ idx: bu.idx, value: bu.args[propName], auto: bu.autoFilled.indexOf(propName) >= 0 });
+          } else {
+            // Also record the snapshot when the variable is absent (still unset)
+            snapshots.push({ idx: bu.idx, value: undefined, auto: false });
+          }
+        });
+        if (snapshots.length > 0) varEvolution[key] = snapshots;
+      });
+
+      // Also track "undeclared" arguments that appear in BindUpdates but aren't in toolDefinitions  
+      // These are plan-level arguments like "Task" for connected agents
+      const undeclaredVars = {};
+      bindUpdates.forEach(bu => {
+        const taskSchema = bu.taskDialogId;
+        Object.keys(bu.args).forEach(argName => {
+          const declKey = taskSchema + '::' + argName;
+          if (!varDeclarations[declKey]) {
+            if (!undeclaredVars[declKey]) {
+              const taskName = taskSchema.split('.').pop();
+              undeclaredVars[declKey] = {
+                name: argName,
+                type: typeof bu.args[argName] === 'boolean' ? 'Boolean' : typeof bu.args[argName] === 'number' ? 'Number' : 'String',
+                desc: '',
+                direction: 'argument',
+                topic: planTopicMap[bu.planId] ? planTopicMap[bu.planId].displayName : taskName,
+                schemaName: taskSchema,
+                propertyName: argName
+              };
+            }
+            if (!varEvolution[declKey]) varEvolution[declKey] = [];
+            varEvolution[declKey].push({ idx: bu.idx, value: bu.args[argName], auto: bu.autoFilled.indexOf(argName) >= 0 });
+          }
+        });
+      });
+
+      // If nothing to show, bail
+      const allDecl = Object.assign({}, varDeclarations, undeclaredVars);
+      const hasVars = Object.keys(allDecl).length > 0;
+      const hasDialogState = dialogStates.length > 0;
+      if (!hasVars && !hasDialogState) return;
+
+      variablesPanel.classList.remove('hidden');
+      let collapsed = false;
+
+      // Render
+      function formatVal(v) {
+        if (v === undefined) return '<span style="color:var(--text-muted);font-style:italic">unset</span>';
+        if (v === null) return '<span style="color:var(--text-muted)">null</span>';
+        if (typeof v === 'boolean') return '<span style="color:' + (v ? 'var(--green)' : 'var(--red)') + '">' + v + '</span>';
+        if (typeof v === 'object') return '<span>' + escapeHtml(JSON.stringify(v)) + '</span>';
+        return '<span>' + escapeHtml(String(v)) + '</span>';
+      }
+
+      let html = '';
+
+      // Group variables by topic
+      const byTopic = {};
+      Object.keys(allDecl).forEach(key => {
+        const d = allDecl[key];
+        if (!byTopic[d.topic]) byTopic[d.topic] = [];
+        byTopic[d.topic].push({ key: key, decl: d });
+      });
+
+      if (hasVars) {
+        html += '<table class="var-table"><thead><tr><th>Variable</th><th>Type</th><th>Direction</th><th>Description</th><th>Value Evolution</th></tr></thead><tbody>';
+        Object.keys(byTopic).forEach(topic => {
+          html += '<tr class="var-scope-row"><td colspan="5">' + escapeHtml(topic) + '</td></tr>';
+          byTopic[topic].forEach(item => {
+            const d = item.decl;
+            const evo = varEvolution[item.key] || [];
+            const badge = d.direction === 'input' ? '<span class="var-badge-in">IN</span>'
+              : d.direction === 'output' ? '<span class="var-badge-out">OUT</span>'
+              : '';
+            html += '<tr>';
+            html += '<td><span class="var-name">' + escapeHtml(d.name) + '</span>' + badge + '</td>';
+            html += '<td><span class="var-type">' + escapeHtml(d.type) + '</span></td>';
+            html += '<td style="font-size:11px;">' + escapeHtml(d.direction) + '</td>';
+            html += '<td><span class="var-desc" title="' + escapeHtml(d.desc) + '">' + escapeHtml(d.desc || '—') + '</span></td>';
+            html += '<td><div class="var-timeline">';
+            if (evo.length === 0) {
+              html += '<span style="color:var(--text-muted);font-size:11px;font-style:italic">No runtime data</span>';
+            } else {
+              let prevVal = undefined;
+              evo.forEach((snap, si) => {
+                if (si > 0) html += '<span class="var-arrow">&#8594;</span>';
+                const changed = si > 0 && JSON.stringify(snap.value) !== JSON.stringify(prevVal);
+                const cls = changed ? ' var-changed' : '';
+                html += '<span class="var-snapshot' + cls + '" title="Activity #' + snap.idx + (snap.auto ? ' (auto-filled)' : '') + '">';
+                html += '<span class="var-step-idx">#' + snap.idx + '</span> ';
+                html += '<span class="var-val">' + formatVal(snap.value) + '</span>';
+                html += '</span>';
+                prevVal = snap.value;
+              });
+            }
+            html += '</div></td>';
+            html += '</tr>';
+          });
+        });
+        html += '</tbody></table>';
+      }
+
+      // DialogTracingInfo variable states
+      if (hasDialogState) {
+        html += '<div class="var-state-section"><h4>Dialog Variable State (DialogTracingInfo)</h4>';
+        dialogStates.forEach(ds => {
+          html += '<div style="margin-bottom:8px;">';
+          html += '<span style="font-size:11px;color:var(--text-muted);">#' + ds.idx + ' ' + escapeHtml(ds.topicId.split('.').pop()) + ' &middot; ' + escapeHtml(ds.actionType) + '</span>';
+          if (ds.dialogState && Object.keys(ds.dialogState).length > 0) {
+            html += '<div style="margin-top:4px;"><span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Dialog State:</span><div class="var-state-kv">';
+            Object.keys(ds.dialogState).forEach(k => {
+              html += '<span class="var-state-chip">' + escapeHtml(k) + ': ' + escapeHtml(JSON.stringify(ds.dialogState[k])) + '</span>';
+            });
+            html += '</div></div>';
+          }
+          if (ds.globalState && Object.keys(ds.globalState).length > 0) {
+            html += '<div style="margin-top:4px;"><span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Global State:</span><div class="var-state-kv">';
+            Object.keys(ds.globalState).forEach(k => {
+              html += '<span class="var-state-chip">' + escapeHtml(k) + ': ' + escapeHtml(JSON.stringify(ds.globalState[k])) + '</span>';
+            });
+            html += '</div></div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      const varCount = Object.keys(allDecl).length;
+      const changesCount = Object.values(varEvolution).reduce((sum, evo) => {
+        let changes = 0;
+        for (let i = 1; i < evo.length; i++) {
+          if (JSON.stringify(evo[i].value) !== JSON.stringify(evo[i-1].value)) changes++;
+        }
+        return sum + changes;
+      }, 0);
+      const statsText = varCount + ' variable' + (varCount !== 1 ? 's' : '') + ' &middot; ' + changesCount + ' change' + (changesCount !== 1 ? 's' : '');
+
+      variablesPanel.innerHTML = '<div class="variables-header"><h3>&#128202; Variable Tracker</h3><span style="font-size:12px;color:var(--text-muted);">' + statsText + '</span></div><div class="variables-body" id="var-body">' + html + '</div>';
+
+      variablesPanel.querySelector('.variables-header').addEventListener('click', () => {
+        collapsed = !collapsed;
+        variablesPanel.querySelector('#var-body').classList.toggle('collapsed-body', collapsed);
+      });
+    })();
+
     // === AUTO-EXPAND ERRORS / COLLAPSE ALL ===
     if (issues.length > 0) {
       // Auto-expand steps that have issues
@@ -3832,7 +4130,7 @@
     clone.querySelectorAll('.dep-lines-svg').forEach(el => el.remove());
     clone.querySelectorAll('.resize-handle').forEach(el => el.remove());
     // Ensure new panels are visible in export
-    clone.querySelectorAll('.waterfall-panel,.knowledge-panel,.flow-panel,.dep-legend').forEach(el => {
+    clone.querySelectorAll('.waterfall-panel,.knowledge-panel,.flow-panel,.variables-panel,.dep-legend').forEach(el => {
       el.classList.remove('hidden');
       el.querySelectorAll('.collapsed-body').forEach(b => b.classList.remove('collapsed-body'));
     });
