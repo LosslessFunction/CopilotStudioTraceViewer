@@ -1299,6 +1299,7 @@
   let lastLoadedData = null; // keep reference for export
   let scrollCleanup = null; // to remove scroll listener on reset
   let minimapCleanup = null; // to remove minimap listeners on reset
+  let keyboardCleanup = null; // to remove keyboard nav listener on reset
 
   // === THEME TOGGLE ===
   (function initTheme() {
@@ -3991,7 +3992,7 @@
         return result;
       }
 
-      document.addEventListener('keydown', (e) => {
+      const keydownHandler = (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (viewer.classList.contains('hidden')) return;
 
@@ -4043,7 +4044,9 @@
             }
           }
         }
-      });
+      };
+      document.addEventListener('keydown', keydownHandler);
+      keyboardCleanup = () => document.removeEventListener('keydown', keydownHandler);
     })();
 
     // === MINIMAP ===
