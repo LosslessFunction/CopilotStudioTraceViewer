@@ -1390,7 +1390,7 @@
 </div>
 
 <div class="container">
-  <div id="upload-zone" role="button" tabindex="0" aria-label="Upload a dialog.json or .zip trace file. Drop file here or press Enter to browse.">
+  <div id="upload-zone" role="button" tabindex="0" aria-label="Upload a botContent.zip or dialog.json trace file. Drop file here or press Enter to browse.">
     <div class="icon">&#128270;</div>
     <div class="big">Drop dialog.json / .zip files here, or click to upload</div>
     <p>Exported conversation trace from Copilot Studio &mdash; drop multiple files for batch analysis</p>
@@ -1531,13 +1531,11 @@
           try {
             botContentData = parseYaml(ymlText);
             botComponentMap = buildComponentMap(botContentData);
-            console.log('[botContent.yml] Parsed successfully. Components:', Object.keys(botComponentMap).length, botComponentMap);
           } catch(e) {
             console.warn('[botContent.yml] Parse error:', e);
             botContentData = null; botComponentMap = {};
           }
         } else {
-          console.log('[botContent.yml] Not found in ZIP');
           botContentData = null;
           botComponentMap = {};
         }
