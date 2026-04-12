@@ -339,6 +339,15 @@
     transition: all 0.15s;
   }
   .step-card:hover { border-color: #484f58; }
+  .step.expanded .step-card { border-color: var(--accent); }
+  .step.type-user-message.expanded .step-card { border-color: var(--accent); }
+  .step.type-bot-message.expanded .step-card { border-color: var(--green); }
+  .step.type-plan.expanded .step-card { border-color: var(--purple); }
+  .step.type-thought.expanded .step-card { border-color: var(--orange); }
+  .step.type-tool.expanded .step-card { border-color: var(--cyan); }
+  .step.type-search.expanded .step-card { border-color: var(--pink); }
+  .step.type-error.expanded .step-card { border-color: var(--red); }
+  .step.type-info.expanded .step-card { border-color: var(--text-muted); }
   .step-header {
     padding: 10px 16px;
     display: flex;
