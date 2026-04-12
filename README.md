@@ -34,9 +34,10 @@ You can upload either the `.zip` or the extracted `dialog.json` directly into th
 ## Features
 
 ### Core Trace Viewer
-- **Upload dialog.json or .zip** — drag-and-drop or click to upload. ZIP files are parsed natively in the browser (no libraries).
+- **Upload dialog.json or .zip** — drag-and-drop or click to upload. ZIP files are parsed natively in the browser (no libraries). When a `.zip` contains both `dialog.json` and `botContent.yml`, both are parsed automatically.
 - **Activity timeline** — every activity is displayed chronologically with color-coded badges (user message, bot message, plan, thought, tool call, search, info, typing, error).
 - **Expandable details** — click any step to expand and see full metadata: timestamps, parameters, observations, raw JSON auto-formatted as key-value pairs.
+- **Friendly topic names** — when `botContent.yml` is available, raw schema names (e.g. `copilots_header_5948b.topic.Greeting`) are replaced with human-readable display names throughout the timeline.
 
 ### Plan Tree Grouping
 - **Hierarchical plan nesting** — `DynamicPlanReceived` events open collapsible plan groups; child plans nest inside parent plans based on `parentPlanIdentifier`.
@@ -70,11 +71,111 @@ You can upload either the `.zip` or the extracted `dialog.json` directly into th
 - **HTML export** — download a self-contained HTML file of the current trace view, preserving all expanded/collapsed states.
 - **Side-by-side comparison** — load two traces to compare them side by side with independent stats, activity counts, and a diff summary.
 - **Copy to clipboard** — each step has a copy button that copies structured JSON data for that activity.
+- **Batch analysis** — upload multiple trace files at once to get aggregate statistics across conversations.
+
+---
+
+### Analysis Panels
+
+Five collapsible analysis panels appear below the trace timeline when relevant data is present. Each panel can be expanded or collapsed by clicking its header.
+
+#### Performance Waterfall
+
+A horizontal bar chart showing the timing of every trace activity. Each bar's width represents the time gap between consecutive activities.
+
+- Activities are sorted by timestamp and displayed as proportional bars against the total conversation duration.
+- Color-coded by category: bot messages (green), user messages (blue), plan events (purple), tool steps (orange), search (teal), errors (red).
+- Hover over any bar to see exact timestamps and duration.
+- Helps identify bottlenecks — long bars indicate slow steps (e.g. a tool call that took several seconds).
+
+#### Knowledge Sources
+
+Extracts and displays all knowledge retrieval data found in the trace, gathered from `GenerativeAnswersSupportData` activities.
+
+- **Search results** — shows all search results returned by knowledge sources, including URL, snippet text, search type (e.g. `DataverseStructuredSearch`, `BingSearch`), and rank score.
+- **Verified search results** — highlights which results passed verification.
+- **Query rewriting** — displays the original user question, the AI-rewritten query, extracted keywords, and hypothetical snippet used for retrieval.
+- **Summarization** — shows the AI's raw summary, final summary, and citation mappings.
+- **Token usage** — displays prompt and completion token counts for both query rewriting and summarization LLM calls.
+- **Model information** — shows which model was used (e.g. `gpt-41-2025-04-14`) and the partner source.
+
+#### Citation Verification
+
+Appears alongside the Knowledge Sources panel when citations are present in bot responses.
+
+- Maps each citation number to its source document with title, URL, and snippet text.
+- Shows whether content provenance and content moderation checks were performed.
+- Displays the `gptAnswerState` (e.g. `Answered`, `NotAnswered`) and `completionState`.
+
+#### Topic Flow
+
+A visual flow diagram showing the execution path through the conversation. Displays the sequence of orchestrator plans, topic invocations, and agent handoffs.
+
+- **Plan nodes** — each orchestrator plan is shown as a node with its plan ID.
+- **Step nodes** — individual steps (topics, tools, actions) are shown with their friendly names and types.
+- **Agent handoffs** — Connected Agent and External Agent (Azure Foundry) invocations are shown as distinct nodes with handoff edges.
+- **Dialog tracing** — `DialogTracingInfo` actions (e.g. `SendActivity`, `BeginDialog`) are shown with their topic context.
+- **Edge labels** — connections between nodes show the relationship type (step, handoff, return).
+- **Plan-step correspondence** — each step node is linked to its parent plan for visual grouping.
+
+#### Variable Tracker
+
+Tracks how variables are declared, bound, and populated across the conversation. Builds a consolidated view from multiple trace event types.
+
+- **Input/output declarations** — variables declared in `DynamicPlanReceived.toolDefinitions` are listed with their names, types (Boolean, String, etc.), descriptions, and directions (input/output).
+- **Argument bindings** — values assigned via `DynamicPlanStepBindUpdate` are shown with their bound values. Auto-filled arguments are tagged with an **AUTO** badge; manually set arguments show **MANUAL**.
+- **Output harvesting** — output variables recovered from `DynamicPlanStepFinished.observation` are shown with a *(step completed)* label.
+- **Per-step grouping** — variables are grouped by the topic/step that declared or used them, with friendly topic names when `botContent.yml` is available.
+
+#### Agent Definition Panel (botContent.yml)
+
+When a `.zip` file contains `botContent.yml`, this panel displays the complete agent configuration extracted from the YAML definition. Starts collapsed by default.
+
+- **Agent Overview** — schema name, authentication mode (e.g. `Integrated`), template version, and recognizer type (e.g. `GenerativeAIRecognizer`).
+- **AI Settings** — toggles for model knowledge, file analysis, semantic search, content moderation level, and opt-in for latest models.
+- **Agent Instructions** — the full system prompt / instructions configured for the GPT component, displayed in a scrollable pre-formatted box.
+- **GPT Capabilities** — web browsing, code interpreter, and other capability flags.
+- **Topics Table** — all topics in the agent listed with display name, schema name, component type, trigger phrases, and authored action count.
+- **Global Variables** — any `GlobalVariableComponent` entries with their types and scopes.
+- **Connectors** — connector definitions with display name, operation count, and whether they are custom connectors.
+
+---
+
+### Enriched Step Details
+
+When `botContent.yml` is loaded, individual trace steps are enriched with additional context:
+
+#### DynamicPlanReceived (Plan Details)
+- **Tool definitions** show display name (with icon if available), description, schema, and a color-coded **tool-kind badge**:
+  - **Connected Agent** (blue) — `InvokeConnectedAgentTaskAction`
+  - **External Agent / Foundry** (purple) — `InvokeExternalAgentTaskAction`
+  - **Topic** (green) — `AdaptiveDialog`
+- Tool inputs and outputs are shown with their types (Boolean, String, etc.).
+
+#### DynamicPlanStepTriggered (Step Details)
+- **Topic Name** — resolved from `botContent.yml` and highlighted in accent color.
+- **Description** — topic description from the agent definition.
+- **Invocation Type** — badge showing whether the step invokes a Connected Agent (Copilot-to-Copilot) or an External Agent (Azure AI Foundry).
+- **Connection Reference** — for external agent calls, the connection reference ID is shown.
+- **AI Thought / Reasoning** — the orchestrator's reasoning for selecting this step.
+- **Trigger Phrases** — from the agent definition, showing all phrases that can trigger this topic.
+- **Authored Flow** — a visual representation of the topic's authored action sequence (SendActivity, Question, SetVariable, BeginDialog, etc.).
+
+#### DynamicPlanStepBindUpdate (Binding Details)
+- Each argument shows an **AUTO** or **MANUAL** badge indicating whether it was auto-filled by the orchestrator or explicitly provided.
+
+#### DynamicPlanStepFinished (Step Result)
+- **Topic Name** resolved from `botContent.yml`.
+- **Execution Time** and **State** with color coding (green for completed, red for failed).
+
+#### DialogTracingInfo
+- Action types shown with friendly topic names instead of raw schema identifiers.
 
 ### UI / UX
 - **Dark theme** — easy on the eyes with a GitHub-inspired dark color palette.
 - **Responsive layout** — works on desktop and mobile. On small screens, the chat pane stacks below the trace.
 - **No dependencies** — pure HTML, CSS, and JavaScript in a single file. Works offline.
+- **Connected agent context** — activities from connected agents are tracked and labeled with the agent name throughout the timeline and flow panel.
 
 ## Known Limitations
 
