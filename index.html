@@ -4488,12 +4488,16 @@
       const connAgentStepIds = new Set(); // stepIds that are connected agent invocations
       connInits.forEach(a => { if (a.value.planStepId) connAgentStepIds.add(a.value.planStepId); });
 
-      // Map connected agent schema -> friendly name from tool definitions
+      // Map connected/external agent schema -> friendly name from tool definitions
       const connAgentNames = {};
+      const externalAgentSchemas = new Set(); // schemaNames that are external agent invocations
       planReceiveds.forEach(a => {
         (a.value.toolDefinitions || []).forEach(td => {
           if (td.toolKind === 'InvokeConnectedAgentTaskAction' || td.toolKind === 'InvokeExternalAgentTaskAction') {
             connAgentNames[td.schemaName] = td.displayName || td.schemaName.split('.').pop();
+          }
+          if (td.toolKind === 'InvokeExternalAgentTaskAction') {
+            externalAgentSchemas.add(td.schemaName);
           }
         });
       });
@@ -4531,6 +4535,17 @@
           const taskId = d.taskDialogId || '';
           // Skip if this step IS the connected agent invocation itself (we handle that via agent-init)
           if (connAgentStepIds.has(d.stepId)) return;
+
+          // Check if this step is an external agent invocation
+          if (externalAgentSchemas.has(taskId)) {
+            const extName = connAgentNames[taskId] || taskId.split('.').pop();
+            const nodeId = 'agent-ext:' + taskId;
+            addNode(nodeId, extName, 'agent-external');
+            if (prevNodeId) flowEdges.push({ from: prevNodeId, to: nodeId, label: 'external call', edgeType: 'external' });
+            prevNodeId = nodeId;
+            return;
+          }
+
           const shortName = taskId.split('.').pop() || taskId;
           const stepType = (d.type || '').toLowerCase();
           let nodeType = 'action';
@@ -4583,7 +4598,7 @@
       nodeArr.forEach((n, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
-        const w = (n.type === 'agent-connected' || n.type === 'agent-parent') ? agentW : nodeW;
+        const w = (n.type === 'agent-connected' || n.type === 'agent-parent' || n.type === 'agent-external') ? agentW : nodeW;
         const totalRowW = cols * (w + gapX);
         nodePos[n.id] = { x: gapX + col * (agentW + gapX), y: gapY + row * (nodeH + gapY), w };
       });
@@ -4591,6 +4606,7 @@
       // Node visual config
       function nodeStyle(n) {
         if (n.type === 'agent-connected') return { fill: 'var(--purple)', stroke: 'var(--purple)', textFill: '#fff', rx: 18, icon: '\uD83E\uDD16 ' };
+        if (n.type === 'agent-external') return { fill: '#2d1b4e', stroke: '#8250df', textFill: '#d2a8ff', rx: 18, icon: '\u2601\uFE0F ' };
         if (n.type === 'agent-parent') return { fill: 'var(--accent)', stroke: 'var(--accent)', textFill: '#fff', rx: 18, icon: '\uD83E\uDD16 ' };
         if (n.type === 'knowledge') return { fill: 'var(--surface2)', stroke: 'var(--cyan)', textFill: 'var(--text)', rx: 6, icon: '\uD83D\uDD0D ' };
         if (n.type === 'topic') return { fill: 'var(--surface2)', stroke: 'var(--green)', textFill: 'var(--text)', rx: 6, icon: '' };
@@ -4602,6 +4618,7 @@
       svgHtml += '<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="var(--text-muted)"/></marker>';
       svgHtml += '<marker id="arrowhead-handoff" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="var(--purple)"/></marker>';
       svgHtml += '<marker id="arrowhead-return" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/></marker>';
+      svgHtml += '<marker id="arrowhead-external" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8250df"/></marker>';
       svgHtml += '</defs>';
 
       // Draw edges
@@ -4616,6 +4633,8 @@
         let edgeCls = '', strokeColor = 'var(--text-muted)', marker = 'url(#arrowhead)', strokeW = '1.5', opacity = '0.5';
         if (e.edgeType === 'handoff') {
           edgeCls = ' class="flow-handoff-edge"'; strokeColor = 'var(--purple)'; marker = 'url(#arrowhead-handoff)'; strokeW = '2.5'; opacity = '0.8';
+        } else if (e.edgeType === 'external') {
+          edgeCls = ' class="flow-external-edge"'; strokeColor = '#8250df'; marker = 'url(#arrowhead-external)'; strokeW = '2.5'; opacity = '0.8';
         } else if (e.edgeType === 'return') {
           edgeCls = ' class="flow-return-edge"'; strokeColor = 'var(--accent)'; marker = 'url(#arrowhead-return)'; strokeW = '2.5'; opacity = '0.8';
         }
@@ -4641,15 +4660,17 @@
         if (!p) return;
         const s = nodeStyle(n);
         const w = p.w || nodeW;
-        svgHtml += '<rect x="' + p.x + '" y="' + p.y + '" width="' + w + '" height="' + nodeH + '" rx="' + s.rx + '" fill="' + s.fill + '" stroke="' + s.stroke + '" stroke-width="' + ((n.type === 'agent-connected' || n.type === 'agent-parent') ? 2 : 1) + '"' + ((n.type === 'agent-connected' || n.type === 'agent-parent') ? ' class="flow-agent-node"' : '') + '/>';
+        const isAgentNode = (n.type === 'agent-connected' || n.type === 'agent-parent' || n.type === 'agent-external');
+        const strokeDash = n.type === 'agent-external' ? ' stroke-dasharray="6,3"' : '';
+        svgHtml += '<rect x="' + p.x + '" y="' + p.y + '" width="' + w + '" height="' + nodeH + '" rx="' + s.rx + '" fill="' + s.fill + '" stroke="' + s.stroke + '" stroke-width="' + (isAgentNode ? 2 : 1) + '"' + strokeDash + (isAgentNode ? ' class="flow-agent-node"' : '') + '/>';
         const displayLabel = s.icon + (n.label.length > 18 ? n.label.substring(0,16) + '..' : n.label);
-        svgHtml += '<text x="' + (p.x + w/2) + '" y="' + (p.y + nodeH/2 + 5) + '" font-size="11" fill="' + s.textFill + '" text-anchor="middle"' + ((n.type === 'agent-connected' || n.type === 'agent-parent') ? ' class="flow-agent-label"' : '') + '>' + escapeHtml(displayLabel) + '</text>';
+        svgHtml += '<text x="' + (p.x + w/2) + '" y="' + (p.y + nodeH/2 + 5) + '" font-size="11" fill="' + s.textFill + '" text-anchor="middle"' + (isAgentNode ? ' class="flow-agent-label"' : '') + '>' + escapeHtml(displayLabel) + '</text>';
       });
 
       svgHtml += '</svg>';
 
       // Stats
-      const agentCount = nodeArr.filter(n => n.type === 'agent-connected' || n.type === 'agent-parent').length;
+      const agentCount = nodeArr.filter(n => n.type === 'agent-connected' || n.type === 'agent-parent' || n.type === 'agent-external').length;
       const topicCount = nodeArr.filter(n => n.type === 'topic').length;
       const handoffs = dedupEdges.filter(e => e.edgeType === 'handoff').length;
       let statsText = nodeArr.length + ' nodes';
@@ -4661,9 +4682,11 @@
       let legendHtml = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 16px;font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);">';
       legendHtml += '<span>\uD83E\uDD16 <span style="color:var(--accent)">\u25CF</span> Parent Agent</span>';
       legendHtml += '<span>\uD83E\uDD16 <span style="color:var(--purple)">\u25CF</span> Connected Agent</span>';
+      legendHtml += '<span>\u2601\uFE0F <span style="color:#8250df">\u25CF</span> External Agent (Foundry)</span>';
       legendHtml += '<span>\uD83D\uDD0D Knowledge</span>';
       legendHtml += '<span>\u25A0 Topic / Action</span>';
       legendHtml += '<span><svg width="20" height="8" style="vertical-align:middle"><line x1="0" y1="4" x2="20" y2="4" stroke="var(--purple)" stroke-width="2" stroke-dasharray="6,3"/></svg> Handoff</span>';
+      legendHtml += '<span><svg width="20" height="8" style="vertical-align:middle"><line x1="0" y1="4" x2="20" y2="4" stroke="#8250df" stroke-width="2"/></svg> External Call</span>';
       legendHtml += '<span><svg width="20" height="8" style="vertical-align:middle"><line x1="0" y1="4" x2="20" y2="4" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3,3"/></svg> Return</span>';
       legendHtml += '</div>';
 
