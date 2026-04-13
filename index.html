@@ -2304,12 +2304,14 @@
   }
 
   function escapeHtml(s) {
-    if (!s) return '';
+    if (s === null || s === undefined) return '';
+    if (typeof s !== 'string') s = String(s);
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function simpleMarkdown(text) {
-    if (!text) return '';
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
     let html = escapeHtml(text);
     // Bold
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
