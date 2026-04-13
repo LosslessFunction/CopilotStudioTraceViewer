@@ -1617,7 +1617,7 @@
       }
       const durationMs = tsFirst && tsLast ? (tsLast - tsFirst) : 0;
       const dur = durationMs > 0 ? (durationMs / 1000).toFixed(1) + 's' : 'N/A';
-      const userTurns = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+      const userTurns = acts.filter(a => isUserMsg(a)).length;
       const errors = acts.filter(a => {
         if (a.valueType === 'DialogTracingInfo' && a.value && a.value.actions) {
           return a.value.actions.some(ac => ac.exception);
@@ -2187,9 +2187,18 @@
     return s.substring(0, len) + '...';
   }
 
+  // Helper: detect if a message activity is from the user.
+  // In Teams channels, from.role may be absent; treat non-bot, non-debug senders as users.
+  function isUserMsg(act) {
+    if (!act || act.type !== 'message' || !act.from) return false;
+    if (act.from.role === 'user') return true;
+    if (act.from.role === 'bot' || act.from.role === 'debug') return false;
+    return true;  // no role field — assume user
+  }
+
   function classifyActivity(act) {
     if (act.type === 'message') {
-      if (act.from && act.from.role === 'user') return { cat: 'user-message', badge: 'User Message', badgeCls: 'badge-user' };
+      if (isUserMsg(act)) return { cat: 'user-message', badge: 'User Message', badgeCls: 'badge-user' };
       if (act.from && act.from.role === 'bot') return { cat: 'bot-message', badge: 'Bot Response', badgeCls: 'badge-bot' };
       if (act.from && act.from.role === 'debug') return { cat: 'info', badge: 'Debug', badgeCls: 'badge-info' };
       return { cat: 'bot-message', badge: 'Message', badgeCls: 'badge-bot' };
@@ -2898,7 +2907,7 @@
 
     // Extract conversation info
     const firstMsg = activities.find(a => a.type === 'message' && a.from && a.from.role === 'bot');
-    const userMsg = activities.find(a => a.type === 'message' && a.from && a.from.role === 'user');
+    const userMsg = activities.find(a => isUserMsg(a));
     const botName = firstMsg ? (firstMsg.from.name || 'Bot') : 'Bot';
     const convId = (firstMsg && firstMsg.conversation) ? firstMsg.conversation.id : '';
     // Find actual first and last timestamps (fall back to localTimestamp)
@@ -3653,7 +3662,7 @@
     const planCount = Object.keys(planRegistry).length;
     const completedPlans = activities.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && !a.value.wasCancelled).length;
     const cancelledPlans = activities.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && a.value.wasCancelled).length;
-    const userTurns = activities.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+    const userTurns = activities.filter(a => isUserMsg(a)).length;
     const botResponses = activities.filter(a => a.type === 'message' && a.from && a.from.role === 'bot').length;
     const toolCalls = activities.filter(a => a.valueType === 'DynamicPlanStepTriggered').length;
     const searchCalls = activities.filter(a => a.valueType === 'UniversalSearchToolTraceData').length;
@@ -3661,7 +3670,7 @@
     // Find slowest step (skip user messages — user think time shouldn't count)
     let slowestMs = 0, slowestName = '';
     activities.forEach((act, i) => {
-      if (act.type === 'message' && act.from && act.from.role === 'user') return;
+      if (isUserMsg(act)) return;
       const actTs = getTs(act);
       if (i === 0 || !actTs) return;
       const prevTs = getTs(activities[i-1]);
@@ -3792,8 +3801,8 @@
       resizeHandle.classList.remove('hidden');
 
       chatActivities.forEach(act => {
-        const isUser = act.from.role === 'user';
-        const isBot = act.from.role === 'bot';
+        const isUser = isUserMsg(act);
+        const isBot = act.from && act.from.role === 'bot';
         if (!isUser && !isBot) return;
 
         const bubble = document.createElement('div');
@@ -5470,7 +5479,7 @@ ${toggleScript}
           if (t) { tsLast = new Date(t); break; }
         }
         const duration = tsFirst && tsLast ? ((tsLast - tsFirst) / 1000).toFixed(1) + 's' : 'N/A';
-        const userTurns = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'user').length;
+        const userTurns = acts.filter(a => isUserMsg(a)).length;
         const botMsgs = acts.filter(a => a.type === 'message' && a.from && a.from.role === 'bot').length;
         const plans = acts.filter(a => a.valueType === 'DynamicPlanReceived').length;
         const completed = acts.filter(a => a.valueType === 'DynamicPlanFinished' && a.value && !a.value.wasCancelled).length;
