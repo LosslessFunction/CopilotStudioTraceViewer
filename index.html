@@ -2493,7 +2493,11 @@
     if (vt === 'DynamicPlanStepFinished') {
       const v = act.value || {};
       const name = friendlyTopicName(v.taskDialogId) || v.taskDialogId || 'Step';
-      return name + ' finished (' + (v.state || '') + ')';
+      const state = v.state || '';
+      if ((state === 'failed' || state === 'error' || state === 'faulted') && v.error) {
+        return name + ' \u274C ' + (v.error.userErrorCode || state) + ': ' + truncate(v.error.message || '', 60);
+      }
+      return name + ' finished (' + state + ')';
     }
     if (vt === 'DynamicPlanFinished') {
       const v = act.value || {};
@@ -2508,7 +2512,12 @@
     if (vt === 'DialogTracingInfo') {
       const actions = (act.value && act.value.actions) || [];
       if (actions.length === 0) return 'Dialog trace (no actions)';
-      return 'Dialog trace: ' + actions.map(a => a.actionType + ' (' + (friendlyTopicName(a.topicId) || a.topicId.split('.').pop()) + ')').join(', ');
+      var hasAibError = actions.some(function(a) { return a.actionType === 'InvokeAIBuilderModelAction' && a.exception; });
+      if (hasAibError) {
+        var aibAction = actions.find(function(a) { return a.actionType === 'InvokeAIBuilderModelAction' && a.exception; });
+        return '\uD83E\uDDE0 AI Builder \u274C ' + truncate(aibAction.exception, 80);
+      }
+      return 'Dialog trace: ' + actions.map(a => a.actionType + ' (' + (friendlyTopicName(a.topicId) || String(a.topicId || '').split('.').pop()) + ')').join(', ');
     }
     if (vt === 'AIBuilderTraceData') {
       const v = act.value || {};
@@ -2788,9 +2797,14 @@
       }
       html += '</div></div>';
       if (v.error) {
-        html += '<div class="detail-section"><h4>Error</h4><div class="detail-content">';
+        var isAibError = (v.error.userErrorCode || '').toLowerCase().indexOf('aimodel') !== -1;
+        html += '<div class="detail-section"><h4>' + (isAibError ? '\uD83E\uDDE0 AI Builder Error' : 'Error') + '</h4><div class="detail-content" style="' + (isAibError ? 'background:rgba(236,72,153,0.06);border:1px solid rgba(236,72,153,0.2);border-radius:6px;padding:10px;' : '') + '">';
         html += '<div class="kv-row"><span class="kv-key">Error Code</span><span class="kv-val" style="color:var(--red);font-weight:600;">' + escapeHtml(v.error.userErrorCode || '') + '</span></div>';
         html += '<div class="kv-row"><span class="kv-key">Message</span><span class="kv-val" style="color:var(--red);">' + escapeHtml(v.error.message || '') + '</span></div>';
+        var paramMatch = (v.error.message || '').match(/parameter with name '([^']+)'/i);
+        if (paramMatch) {
+          html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(248,81,73,0.08);border-radius:4px;font-size:11px;"><span style="color:var(--red);font-weight:600;">\u26A0 Missing required input:</span> <code style="color:var(--red);">' + escapeHtml(paramMatch[1]) + '</code></div>';
+        }
         html += '</div></div>';
       }
       if (v.observation && Object.keys(v.observation).filter(k => k !== 'downloaded_files').length > 0) {
@@ -2934,7 +2948,18 @@
           }
           html += '<div class="kv-row"><span class="kv-key">Trigger</span><span class="kv-val">' + escapeHtml(a.triggerId || '') + '</span></div>';
           if (a.exception) {
-            html += '<div class="kv-row"><span class="kv-key" style="color:var(--red);">Exception</span><span class="kv-val" style="color:var(--red);">' + escapeHtml(a.exception) + '</span></div>';
+            if (a.actionType === 'InvokeAIBuilderModelAction') {
+              html += '<div style="margin-top:4px;padding:8px;background:rgba(236,72,153,0.06);border:1px solid rgba(236,72,153,0.2);border-radius:6px;">';
+              html += '<div style="font-size:11px;font-weight:600;color:#ec4899;margin-bottom:4px;">\uD83E\uDDE0 AI Builder Validation Error</div>';
+              html += '<div style="color:var(--red);font-size:12px;">' + escapeHtml(a.exception) + '</div>';
+              var paramMatch = (a.exception || '').match(/parameter with name '([^']+)'/i);
+              if (paramMatch) {
+                html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(248,81,73,0.08);border-radius:4px;font-size:11px;"><span style="color:var(--red);font-weight:600;">\u26A0 Missing required input:</span> <code style="color:var(--red);">' + escapeHtml(paramMatch[1]) + '</code></div>';
+              }
+              html += '</div>';
+            } else {
+              html += '<div class="kv-row"><span class="kv-key" style="color:var(--red);">Exception</span><span class="kv-val" style="color:var(--red);">' + escapeHtml(a.exception) + '</span></div>';
+            }
           }
           if (a.resultTrace && Object.keys(a.resultTrace).length) {
             html += '<div class="kv-row"><span class="kv-key">Result Trace</span><span class="kv-val"><pre style="margin:0;">' + escapeHtml(JSON.stringify(a.resultTrace, null, 2)) + '</pre></span></div>';
@@ -3416,7 +3441,9 @@
       if (vt === 'DialogTracingInfo' && act.value && act.value.actions) {
         act.value.actions.forEach(a => {
           if (a.exception) {
-            issues.push({ type: 'error', title: 'Exception in ' + (a.actionType || 'action') + ': ' + truncate(a.exception, 80), stepIndex: i, activityRef: act });
+            var errPrefix = (a.actionType || 'action');
+            if (a.actionType === 'InvokeAIBuilderModelAction') errPrefix = '\uD83E\uDDE0 AI Builder';
+            issues.push({ type: 'error', title: errPrefix + ': ' + truncate(a.exception, 100), stepIndex: i, activityRef: act });
           }
         });
       }
@@ -3433,7 +3460,13 @@
       if (vt === 'DynamicPlanStepFinished' && act.value) {
         const state = (act.value.state || '').toLowerCase();
         if (state === 'error' || state === 'failed' || state === 'faulted') {
-          issues.push({ type: 'error', title: (act.value.taskDialogId || 'Step') + ' finished with ' + act.value.state, stepIndex: i, activityRef: act });
+          var errTitle = friendlyTopicName(act.value.taskDialogId) || act.value.taskDialogId || 'Step';
+          errTitle += ' failed';
+          if (act.value.error) {
+            if (act.value.error.userErrorCode) errTitle += ' [' + act.value.error.userErrorCode + ']';
+            if (act.value.error.message) errTitle += ': ' + truncate(act.value.error.message, 80);
+          }
+          issues.push({ type: 'error', title: errTitle, stepIndex: i, activityRef: act });
         }
       }
       // Debug messages that are errors
@@ -5541,6 +5574,7 @@
       // 2b. Enrich invocations with AI Builder data from AIBuilderTraceData and DialogTracingInfo
       const aiBuilderTraces = {}; // actionId → { input, outputText, topicSchemaName }
       const aiBuilderOutputs = {}; // actionId → aib_Output object
+      const aiBuilderErrors = {}; // topicSchemaName → { exception, actionId }
       activities.forEach(a => {
         if (a.valueType === 'AIBuilderTraceData' && a.value) {
           const v = a.value;
@@ -5548,10 +5582,15 @@
         }
         if (a.valueType === 'DialogTracingInfo' && a.value && a.value.actions) {
           a.value.actions.forEach(act => {
-            if (act.actionType === 'InvokeAIBuilderModelAction' && act.variableState && act.variableState.dialogState) {
-              const ds = act.variableState.dialogState;
-              if (ds.aib_Output && typeof ds.aib_Output === 'object') {
-                aiBuilderOutputs[act.actionId || ''] = ds.aib_Output;
+            if (act.actionType === 'InvokeAIBuilderModelAction') {
+              if (act.variableState && act.variableState.dialogState) {
+                const ds = act.variableState.dialogState;
+                if (ds.aib_Output && typeof ds.aib_Output === 'object') {
+                  aiBuilderOutputs[act.actionId || ''] = ds.aib_Output;
+                }
+              }
+              if (act.exception) {
+                aiBuilderErrors[act.topicId || ''] = { exception: act.exception, actionId: act.actionId || '' };
               }
             }
           });
@@ -5602,6 +5641,23 @@
             if (inv.observation && inv.observation.aib_Output) {
               inv._aibOutput = inv.observation.aib_Output;
               t._isAIBuilder = true;
+            }
+          });
+        });
+      });
+
+      // Flag AI Builder validation errors on matching tools
+      Object.entries(aiBuilderErrors).forEach(function(entry) {
+        var tSchema = entry[0];
+        var errInfo = entry[1];
+        // The error topic might be a child topic called via BeginDialog — find parent step
+        Object.values(tools).forEach(t => {
+          t.invocations.forEach(inv => {
+            if (inv.error && (inv.error.userErrorCode || '').toLowerCase().indexOf('aimodel') !== -1) {
+              inv._isAibValidationError = true;
+              t._isAIBuilder = true;
+              t._hasAibValidationError = true;
+              t._aibValidationMessage = inv.error.message || errInfo.exception || '';
             }
           });
         });
@@ -5736,6 +5792,15 @@
             if (aibModelName) html += '<span style="color:var(--text-muted);">Model: <strong style="color:var(--text);">' + escapeHtml(aibModelName) + '</strong></span>';
             if (totalTokens > 0) html += '<span style="color:var(--text-muted);">Tokens: <strong style="color:var(--text);">' + totalTokens.toLocaleString() + '</strong></span>';
             if (totalCredits > 0) html += '<span style="color:var(--orange);">Credits: <strong>' + totalCredits + '</strong></span>';
+            html += '</div>';
+          }
+          if (t._hasAibValidationError) {
+            html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.2);border-radius:4px;font-size:11px;">';
+            html += '<span style="color:var(--red);font-weight:600;">\u274C Validation Error:</span> <span style="color:var(--red);">' + escapeHtml(truncate(t._aibValidationMessage || '', 120)) + '</span>';
+            var paramMatch = (t._aibValidationMessage || '').match(/parameter with name '([^']+)'/i);
+            if (paramMatch) {
+              html += '<br><span style="color:var(--red);font-size:10px;">Missing required input: <code>' + escapeHtml(paramMatch[1]) + '</code></span>';
+            }
             html += '</div>';
           }
         }
