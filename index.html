@@ -1184,6 +1184,30 @@
   .tool-card-stat { display: flex; align-items: center; gap: 4px; }
   .tool-card-stat .stat-val { font-weight: 600; color: var(--text); }
 
+  /* === Orchestration Timeline === */
+  .orch-timeline-panel { margin: 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .orch-timeline-panel.hidden { display: none; }
+  .orch-timeline-header { padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .orch-timeline-header h3 { font-size: 14px; color: var(--heading); }
+  .orch-timeline-body { padding: 12px; }
+  .orch-timeline-body.collapsed-body { display: none; }
+  .orch-cycles { margin-bottom: 14px; }
+  .orch-cycle { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; }
+  .orch-cycle-header { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; user-select: none; }
+  .orch-cycle-header::after { content: '\25B6'; font-size: 8px; color: var(--text-muted); margin-left: auto; transition: transform 0.2s; }
+  .orch-cycle.expanded .orch-cycle-header::after { transform: rotate(90deg); }
+  .orch-cycle-steps { display: none; margin-top: 6px; padding-left: 4px; }
+  .orch-cycle.expanded .orch-cycle-steps { display: block; }
+  .orch-step-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11px; border-left: 2px solid var(--border); padding-left: 8px; margin-left: 4px; }
+  .orch-step-row.step-ok { border-left-color: var(--green); }
+  .orch-step-row.step-fail { border-left-color: var(--red); }
+  .orch-cycle-flow { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; margin-top: 4px; }
+  .orch-chip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .orch-chip.ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .orch-chip.fail { background: rgba(248,81,73,0.15); color: var(--red); }
+  .orch-chip.pending { background: rgba(136,136,136,0.15); color: var(--text-muted); }
+  .orch-no-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 12px; margin-bottom: 6px; background: rgba(210,153,34,0.08); border: 1px dashed var(--orange); border-radius: 6px; font-size: 11px; }
+
   /* === Agent Definition Panel (botContent.yml) === */
   .agent-def-panel { margin: 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .agent-def-panel.hidden { display: none; }
@@ -1455,6 +1479,7 @@
         <div id="flow-panel" class="flow-panel hidden"></div>
         <div id="variables-panel" class="variables-panel hidden"></div>
         <div id="tools-panel" class="tools-panel hidden"></div>
+        <div id="orch-timeline-panel" class="orch-timeline-panel hidden"></div>
         <div id="agent-def-panel" class="agent-def-panel hidden"></div>
         <div class="filter-bar" id="filter-bar"></div>
         <div id="breadcrumb-bar" class="breadcrumb-bar empty"></div>
@@ -1491,6 +1516,7 @@
   const flowPanel = document.getElementById('flow-panel');
   const variablesPanel = document.getElementById('variables-panel');
   const toolsPanel = document.getElementById('tools-panel');
+  const orchTimelinePanel = document.getElementById('orch-timeline-panel');
   const agentDefPanel = document.getElementById('agent-def-panel');
   const batchDashboard = document.getElementById('batch-dashboard');
   const depLegend = document.getElementById('dep-legend');
@@ -3034,6 +3060,8 @@
     variablesPanel.classList.add('hidden');
     toolsPanel.innerHTML = '';
     toolsPanel.classList.add('hidden');
+    orchTimelinePanel.innerHTML = '';
+    orchTimelinePanel.classList.add('hidden');
     agentDefPanel.innerHTML = '';
     agentDefPanel.classList.add('hidden');
     depLegend.innerHTML = '';
@@ -5587,6 +5615,222 @@
 
       // Expand/collapse individual tool cards
       toolsPanel.querySelectorAll('.tool-card-header').forEach(hdr => {
+        hdr.addEventListener('click', e => {
+          e.stopPropagation();
+          hdr.parentElement.classList.toggle('expanded');
+        });
+      });
+    })();
+
+    // === ORCHESTRATION TIMELINE PANEL ===
+    (function initOrchTimeline() {
+      const orchTimeline = []; // { type: 'cycle'|'user-msg'|'bot-msg', ... }
+      const cycleStack = []; // stack for nesting
+
+      function currentCycle() { return cycleStack.length > 0 ? cycleStack[cycleStack.length - 1] : null; }
+      function findStepInStack(sid) {
+        for (let i = cycleStack.length - 1; i >= 0; i--) {
+          const found = cycleStack[i].steps.find(st => st.stepId === sid);
+          if (found) return found;
+        }
+        return null;
+      }
+
+      activities.forEach((a, idx) => {
+        // Capture user/bot messages when no cycle is active
+        if (a.type === 'message') {
+          if (isUserMsg(a)) {
+            const text = a.text || '';
+            if (text && cycleStack.length === 0) orchTimeline.push({ type: 'user-msg', text: text, ts: a.timestamp || a.localTimestamp, stepIdx: idx });
+          } else if (a.from && a.from.role === 'bot' && a.text && cycleStack.length === 0) {
+            orchTimeline.push({ type: 'bot-msg', text: a.text, ts: a.timestamp || a.localTimestamp });
+          }
+        }
+
+        const vt = a.valueType || '';
+        if (vt === 'DynamicPlanReceived' && a.value) {
+          const newCycle = {
+            type: 'cycle', planId: a.value.planIdentifier || '', isFinal: a.value.isFinalPlan,
+            ts: a.timestamp || a.localTimestamp, steps: [], children: [], finished: false, depth: cycleStack.length
+          };
+          if (a.value.toolDefinitions) {
+            newCycle._toolDefs = a.value.toolDefinitions.map(td => ({
+              name: td.displayName || String(td.schemaName || '').split('.').pop(), kind: td.toolKind || ''
+            }));
+          }
+          const parent = currentCycle();
+          if (parent) {
+            const parentStep = parent.steps[parent.steps.length - 1];
+            if (parentStep) {
+              if (!parentStep.children) parentStep.children = [];
+              parentStep.children.push(newCycle);
+            } else {
+              parent.children.push(newCycle);
+            }
+          } else {
+            orchTimeline.push(newCycle);
+          }
+          cycleStack.push(newCycle);
+        }
+        const cc = currentCycle();
+        if (cc && vt === 'DynamicPlanReceivedDebug' && a.value) {
+          cc._ask = a.value.ask || '';
+          cc._summary = a.value.summary || '';
+        }
+        if (cc && vt === 'DynamicPlanStepTriggered' && a.value) {
+          cc.steps.push({
+            stepId: a.value.stepId || '', task: a.value.taskDialogId || '',
+            thought: a.value.thought || '', state: '', error: null,
+            ts: a.timestamp || a.localTimestamp, children: []
+          });
+        }
+        if (cc && vt === 'DynamicPlanStepBindUpdate' && a.value) {
+          const existing = findStepInStack(a.value.stepId || '');
+          if (existing) {
+            existing._argCount = Object.keys(a.value.arguments || {}).length;
+            existing._nullArgs = Object.entries(a.value.arguments || {}).filter(([k,v]) => v === null || v === undefined || v === '').map(([k]) => k);
+          }
+        }
+        if (cc && vt === 'DynamicPlanStepFinished' && a.value) {
+          const sid = a.value.stepId || '';
+          const existing = findStepInStack(sid);
+          if (existing) {
+            existing.state = a.value.state || '';
+            existing.error = a.value.error || null;
+            existing.executionTime = a.value.executionTime || '';
+          } else {
+            cc.steps.push({ stepId: sid, task: a.value.taskDialogId || '', state: a.value.state || '', error: a.value.error || null, ts: a.timestamp || a.localTimestamp, children: [] });
+          }
+        }
+        if (vt === 'DynamicPlanFinished' && cycleStack.length > 0) {
+          cycleStack[cycleStack.length - 1].finished = true;
+          cycleStack.pop();
+        }
+      });
+
+      // Detect "no plan" exchanges
+      const enrichedTimeline = [];
+      for (let i = 0; i < orchTimeline.length; i++) {
+        enrichedTimeline.push(orchTimeline[i]);
+        if (orchTimeline[i].type === 'user-msg') {
+          const next = orchTimeline[i + 1];
+          if (next && next.type === 'bot-msg') {
+            enrichedTimeline.push({ type: 'no-plan', ts: orchTimeline[i].ts });
+          }
+        }
+      }
+      const finalTimeline = enrichedTimeline;
+
+      const cycles = orchTimeline.filter(e => e.type === 'cycle');
+      function countAllCycles(items) {
+        let count = 0;
+        items.forEach(item => {
+          if (item.type === 'cycle') {
+            count++;
+            item.steps.forEach(st => { if (st.children) count += countAllCycles(st.children); });
+            if (item.children) count += countAllCycles(item.children);
+          }
+        });
+        return count;
+      }
+      const totalCycles = countAllCycles(orchTimeline);
+
+      if (finalTimeline.length === 0 || totalCycles === 0) return;
+
+      let cycleCounter = 0;
+
+      function renderCycle(cycle) {
+        cycleCounter++;
+        const localNum = cycleCounter;
+        const hasFail = cycle.steps.some(st => st.state === 'failed' || st.state === 'error' || st.state === 'faulted');
+        const cycleIcon = hasFail ? '\u274C' : (cycle.finished ? '\u2705' : '\u23F3');
+        const depthIndent = cycle.depth > 0 ? ' style="margin-left:' + (cycle.depth * 20) + 'px;border-left:2px solid var(--accent);opacity:0.95;"' : '';
+
+        let h = '<div class="orch-cycle"' + depthIndent + '>';
+        h += '<div class="orch-cycle-header">';
+        h += '<span>' + cycleIcon + '</span>';
+        h += '<span style="font-weight:600;">Cycle ' + localNum + (cycle.depth > 0 ? ' <span style="font-size:9px;color:var(--accent);font-weight:normal;">(sub)</span>' : '') + '</span>';
+        h += '<span class="orch-cycle-flow">';
+        cycle.steps.forEach((st, si) => {
+          if (si > 0) h += '<span style="color:var(--text-muted);font-size:9px;"> \u2192 </span>';
+          const isOk = st.state === 'completed';
+          const isFail = st.state === 'failed' || st.state === 'error' || st.state === 'faulted';
+          const cls = isOk ? 'ok' : isFail ? 'fail' : 'pending';
+          const icon = isOk ? '\u2705' : isFail ? '\u274C' : '\u23F3';
+          h += '<span class="orch-chip ' + cls + '">' + icon + ' ' + escapeHtml(friendlyTopicName(st.task)) + '</span>';
+        });
+        h += '</span>';
+        h += '<span style="font-size:10px;color:var(--text-muted);">' + formatTime(cycle.ts) + '</span>';
+        h += '</div>';
+
+        h += '<div class="orch-cycle-steps">';
+        if (cycle._ask) h += '<div style="padding:4px 8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);border-left:2px solid var(--orange);margin-left:4px;padding-left:8px;"><span style="color:var(--orange);">Ask:</span> ' + escapeHtml(truncate(cycle._ask, 120)) + '</div>';
+        if (cycle._summary) h += '<div style="padding:2px 8px;margin-bottom:4px;font-size:10px;color:var(--text-muted);margin-left:14px;font-style:italic;">' + escapeHtml(truncate(cycle._summary, 150)) + '</div>';
+        if (cycle._toolDefs && cycle._toolDefs.length > 0) {
+          h += '<div style="padding:2px 8px;margin-bottom:6px;font-size:10px;color:var(--text-muted);margin-left:14px;">Available: ';
+          h += cycle._toolDefs.map(td => '<span style="padding:0 4px;background:var(--surface2);border-radius:3px;border:1px solid var(--border);font-size:9px;">' + escapeHtml(td.name || td.kind) + '</span>').join(' ');
+          h += '</div>';
+        }
+        cycle.steps.forEach(st => {
+          const isOk = st.state === 'completed';
+          const isFail = st.state === 'failed' || st.state === 'error' || st.state === 'faulted';
+          const rowCls = isOk ? 'step-ok' : isFail ? 'step-fail' : '';
+          h += '<div class="orch-step-row ' + rowCls + '">';
+          h += '<span>' + (isOk ? '\u2705' : isFail ? '\u274C' : '\u23F3') + '</span>';
+          h += '<strong style="color:var(--heading);">' + escapeHtml(friendlyTopicName(st.task)) + '</strong>';
+          if (st.executionTime) h += '<span style="color:var(--text-muted);font-size:10px;">(' + escapeHtml(st.executionTime) + ')</span>';
+          if (st._argCount) h += '<span style="font-size:10px;color:var(--text-muted);">' + st._argCount + ' args' + (st._nullArgs && st._nullArgs.length ? ' <span style="color:var(--orange);">(' + st._nullArgs.length + ' blank)</span>' : '') + '</span>';
+          if (st.thought) h += '<span style="font-style:italic;color:var(--orange);font-size:10px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">&quot;' + escapeHtml(truncate(st.thought, 60)) + '&quot;</span>';
+          if (st.error) {
+            const errMsg = st.error.message || st.error.userErrorCode || '';
+            h += '<span style="color:var(--red);font-size:10px;">' + escapeHtml(truncate(errMsg, 80)) + '</span>';
+          }
+          h += '</div>';
+          if (st.children && st.children.length > 0) {
+            st.children.forEach(child => { h += renderCycle(child); });
+          }
+        });
+        if (cycle.children && cycle.children.length > 0) {
+          cycle.children.forEach(child => { h += renderCycle(child); });
+        }
+        h += '</div>';
+        h += '</div>';
+        return h;
+      }
+
+      let html = '<div class="orch-cycles">';
+      finalTimeline.forEach((item) => {
+        if (item.type === 'user-msg') {
+          html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;font-size:11px;color:var(--text-muted);"><span>\uD83D\uDC64</span><span style="color:var(--text);font-style:italic;">&quot;' + escapeHtml(truncate(item.text, 80)) + '&quot;</span><span style="font-size:10px;">' + formatTime(item.ts) + '</span></div>';
+          return;
+        }
+        if (item.type === 'bot-msg') {
+          html += '<div style="display:flex;align-items:center;gap:6px;padding:2px 8px;font-size:10px;color:var(--text-muted);"><span>\uD83E\uDD16</span><span style="font-style:italic;">' + escapeHtml(truncate(item.text, 60)) + '</span></div>';
+          return;
+        }
+        if (item.type === 'no-plan') {
+          html += '<div class="orch-no-plan"><span>\u26A0\uFE0F</span><span style="font-weight:600;color:var(--orange);">No plan created</span><span style="font-size:10px;color:var(--text-muted);">Routing LLM returned no tool calls</span></div>';
+          return;
+        }
+        if (item.type === 'cycle') {
+          html += renderCycle(item);
+        }
+      });
+      html += '</div>';
+
+      const statsText = totalCycles + ' cycle' + (totalCycles !== 1 ? 's' : '');
+      const noPlanCount = finalTimeline.filter(e => e.type === 'no-plan').length;
+      const statsExtra = noPlanCount > 0 ? ' &middot; <span style="color:var(--orange);">' + noPlanCount + ' no-plan</span>' : '';
+      orchTimelinePanel.classList.remove('hidden');
+      let collapsed = true;
+      orchTimelinePanel.innerHTML = '<div class="orch-timeline-header"><h3>\uD83D\uDD04 Orchestration Timeline</h3><span style="font-size:12px;color:var(--text-muted);">' + statsText + statsExtra + '</span></div><div class="orch-timeline-body collapsed-body" id="orch-timeline-body">' + html + '</div>';
+
+      orchTimelinePanel.querySelector('.orch-timeline-header').addEventListener('click', () => {
+        collapsed = !collapsed;
+        orchTimelinePanel.querySelector('#orch-timeline-body').classList.toggle('collapsed-body', collapsed);
+      });
+
+      orchTimelinePanel.querySelectorAll('.orch-cycle-header').forEach(hdr => {
         hdr.addEventListener('click', e => {
           e.stopPropagation();
           hdr.parentElement.classList.toggle('expanded');
