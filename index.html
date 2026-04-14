@@ -66,18 +66,24 @@
     margin: 0 auto;
     padding: 24px;
   }
+  .container.app-active {
+    padding: 0;
+    height: calc(100vh - 58px);
+    overflow: hidden;
+  }
 
   /* App layout: trace + chat side by side */
   .app-layout {
     display: flex;
     gap: 0;
     align-items: stretch;
-    min-height: calc(100vh - 120px);
+    height: 100%;
   }
   .app-layout .trace-pane {
     flex: 1 1 0;
     min-width: 300px;
     overflow-y: auto;
+    padding: 24px;
   }
   .app-layout .resize-handle {
     width: 6px;
@@ -1353,6 +1359,20 @@
   .cit-summary-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .cit-source-url { font-size: 11px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* === Panel Quick-Nav === */
+  .panel-quicknav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50; display: none; }
+  .panel-quicknav.visible { display: flex; }
+  .pqn-toggle { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: var(--text); cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 6px; transition: background 0.15s, box-shadow 0.15s; white-space: nowrap; }
+  .pqn-toggle:hover { background: var(--surface2); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+  .pqn-menu { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: none; min-width: 220px; max-height: 70vh; overflow-y: auto; }
+  .pqn-menu.open { display: block; }
+  .pqn-item { padding: 6px 14px; font-size: 12px; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; transition: background 0.1s; }
+  .pqn-item:hover { background: var(--surface2); }
+  .pqn-item .pqn-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+  .pqn-item .pqn-label { flex: 1; }
+  .pqn-item.pqn-current { color: var(--accent); font-weight: 600; }
+  .pqn-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
   /* === Keyboard Shortcuts Overlay === */
   .shortcuts-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -1408,7 +1428,7 @@
     body { background: #fff; color: #000; }
     header { background: #fff; border-bottom: 2px solid #000; }
     header h1 { color: #000; }
-    .theme-toggle, .toolbar-btn, .search-box, .resize-handle, .chat-pane, .minimap, #upload-zone { display: none !important; }
+    .theme-toggle, .toolbar-btn, .search-box, .resize-handle, .chat-pane, .minimap, .panel-quicknav, #upload-zone { display: none !important; }
     .app-layout { display: block; }
     .step-card { border: 1px solid #ccc; break-inside: avoid; }
     .plan-group-header { position: relative; top: auto; border: 1px solid #ccc; break-inside: avoid; }
@@ -1453,6 +1473,11 @@
       <div class="sc-row"><span class="sc-desc">Focus search</span><span class="sc-keys"><span class="sc-key">/</span></span></div>
     </div>
   </div>
+</div>
+
+<div class="panel-quicknav" id="panel-quicknav">
+  <button class="pqn-toggle" id="pqn-toggle">&#9776; Panels</button>
+  <div class="pqn-menu" id="pqn-menu"></div>
 </div>
 
 <div class="container">
@@ -1531,6 +1556,7 @@
   const minimapViewport = document.getElementById('minimap-viewport');
   const shortcutsOverlay = document.getElementById('shortcuts-overlay');
   const shortcutsClose = document.getElementById('shortcuts-close');
+  const panelQuicknav = document.getElementById('panel-quicknav');
   let currentFileName = '';
   let lastLoadedData = null; // keep reference for export
   let botContentData = null; // parsed botContent.yml data
@@ -3042,6 +3068,7 @@
   function resetViewer() {
     viewer.classList.add('hidden');
     uploadZone.classList.remove('hidden');
+    document.querySelector('.container').classList.remove('app-active');
     toolbar.innerHTML = '';
     convInfo.innerHTML = '';
     statsPanel.innerHTML = '';
@@ -3078,6 +3105,7 @@
     chatPane.classList.add('hidden');
     resizeHandle.classList.add('hidden');
     chatPane.style.width = '';
+    panelQuicknav.classList.remove('visible');
     fileInput.value = '';
     currentFileName = '';
     lastLoadedData = null;
@@ -3097,6 +3125,7 @@
 
     uploadZone.classList.add('hidden');
     viewer.classList.remove('hidden');
+    document.querySelector('.container').classList.add('app-active');
 
     // Build toolbar: file name, expand/collapse all, re-upload
     toolbar.innerHTML = '';
@@ -4153,7 +4182,9 @@
         });
       };
       window.addEventListener('scroll', scrollHandler, { passive: true });
-      scrollCleanup = () => window.removeEventListener('scroll', scrollHandler);
+      var tp = document.getElementById('trace-pane');
+      if (tp) tp.addEventListener('scroll', scrollHandler, { passive: true });
+      scrollCleanup = () => { window.removeEventListener('scroll', scrollHandler); if (tp) tp.removeEventListener('scroll', scrollHandler); };
       // Initial
       setTimeout(observerCallback, 100);
     }
@@ -6070,6 +6101,7 @@
     (function initMinimap() {
       const allSteps = timeline.querySelectorAll('.step');
       if (allSteps.length < 5) { minimapEl.classList.add('hidden'); return; }
+      const tracePane = document.getElementById('trace-pane');
 
       minimapEl.classList.remove('hidden');
       // Clear old blocks
@@ -6094,12 +6126,12 @@
       });
 
       function updateViewport() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight;
-        const viewportHeight = window.innerHeight;
+        const scrollTop = tracePane.scrollTop;
+        const scrollHeight = tracePane.scrollHeight;
+        const clientHeight = tracePane.clientHeight;
         const minimapHeight = minimapEl.clientHeight;
-        const vpTop = (scrollTop / docHeight) * minimapHeight;
-        const vpHeight = (viewportHeight / docHeight) * minimapHeight;
+        const vpTop = (scrollTop / scrollHeight) * minimapHeight;
+        const vpHeight = (clientHeight / scrollHeight) * minimapHeight;
         minimapViewport.style.top = vpTop + 'px';
         minimapViewport.style.height = Math.max(10, vpHeight) + 'px';
       }
@@ -6107,18 +6139,78 @@
       function onMinimapClick(e) {
         const rect = minimapEl.getBoundingClientRect();
         const pct = (e.clientY - rect.top) / rect.height;
-        const scrollTarget = pct * document.documentElement.scrollHeight;
-        window.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+        const scrollTarget = pct * tracePane.scrollHeight;
+        tracePane.scrollTo({ top: scrollTarget, behavior: 'smooth' });
       }
 
       minimapEl.addEventListener('click', onMinimapClick);
-      window.addEventListener('scroll', updateViewport, { passive: true });
+      tracePane.addEventListener('scroll', updateViewport, { passive: true });
       updateViewport();
 
       minimapCleanup = () => {
-        window.removeEventListener('scroll', updateViewport);
+        tracePane.removeEventListener('scroll', updateViewport);
         minimapEl.removeEventListener('click', onMinimapClick);
       };
+    })();
+
+    // === PANEL QUICK-NAV ===
+    (function initPanelQuickNav() {
+      const qnav = panelQuicknav;
+      const qnavToggle = document.getElementById('pqn-toggle');
+      const qnavMenu = document.getElementById('pqn-menu');
+      const tracePane = document.getElementById('trace-pane');
+
+      const panelDefs = [
+        { id: 'waterfall-panel', icon: '\u23F2', label: 'Performance Waterfall' },
+        { id: 'knowledge-panel', icon: '\uD83D\uDCDA', label: 'Knowledge Sources' },
+        { id: 'citation-panel', icon: '\u2705', label: 'Citation Verification' },
+        { id: 'flow-panel', icon: '\uD83D\uDD00', label: 'Topic Flow' },
+        { id: 'variables-panel', icon: '\uD83D\uDCCA', label: 'Variable Tracker' },
+        { id: 'tools-panel', icon: '\uD83D\uDEE0\uFE0F', label: 'Tools Summary' },
+        { id: 'orch-timeline-panel', icon: '\uD83D\uDD04', label: 'Orchestration Timeline' },
+        { id: 'agent-def-panel', icon: '\uD83E\uDD16', label: 'Agent Definition' },
+        { id: null, divider: true },
+        { id: 'timeline', icon: '\uD83D\uDCDC', label: 'Timeline (steps)' },
+      ];
+
+      function buildMenu() {
+        let html = '<div class="pqn-item" data-target="_top"><span class="pqn-icon">\u2B06\uFE0F</span><span class="pqn-label">Back to Top</span></div>';
+        html += '<div class="pqn-divider"></div>';
+        panelDefs.forEach(function(p) {
+          if (p.divider) { html += '<div class="pqn-divider"></div>'; return; }
+          var el = document.getElementById(p.id);
+          if (!el || el.classList.contains('hidden')) return;
+          html += '<div class="pqn-item" data-target="' + p.id + '"><span class="pqn-icon">' + p.icon + '</span><span class="pqn-label">' + p.label + '</span></div>';
+        });
+        qnavMenu.innerHTML = html;
+        qnavMenu.querySelectorAll('.pqn-item').forEach(function(item) {
+          item.addEventListener('click', function() {
+            var tid = item.getAttribute('data-target');
+            if (tid === '_top') {
+              tracePane.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              var target = document.getElementById(tid);
+              if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            qnavMenu.classList.remove('open');
+          });
+        });
+      }
+
+      qnavToggle.addEventListener('click', function() {
+        if (qnavMenu.classList.contains('open')) {
+          qnavMenu.classList.remove('open');
+        } else {
+          buildMenu();
+          qnavMenu.classList.add('open');
+        }
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!qnav.contains(e.target)) qnavMenu.classList.remove('open');
+      });
+
+      qnav.classList.add('visible');
     })();
   }
 
