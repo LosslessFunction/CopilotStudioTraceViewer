@@ -4,9 +4,6 @@ A React web application for exploring and analyzing conversation traces exported
 
 ![React](https://img.shields.io/badge/React-18-61dafb?logo=react) ![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss)
 
-<img width="2524" height="1232" alt="image" src="https://github.com/user-attachments/assets/703ef96d-b678-44ae-8cb3-e27c543496c1" />
-
-<img width="2512" height="1219" alt="image" src="https://github.com/user-attachments/assets/b016c5f7-e631-4c02-be5f-3a26ba10f900" />
 
 ## Getting Started
 
